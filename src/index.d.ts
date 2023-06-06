@@ -14,7 +14,7 @@ declare module 'repl' {
   }
 }
 
-declare const rtepl: repl;
+declare const rtepl: typeof repl;
 
 export default rtepl;
 
