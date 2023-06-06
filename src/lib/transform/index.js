@@ -18,7 +18,7 @@ const extensionDefaults = {
  */
 export const transpile = async (args, extensions) => {
   const { typescript, ...opts } = { ...extensionDefaults, ...extensions };
-  typescript && (args[0] = await esbuild(args));
+  typescript && (args[0] = await esbuild(args[0], args[2]));
   if (!Object.values(opts).some((enabled) => enabled)) return args;
   try {
     const ast = parse(args[0], { module: true, next: true });
@@ -30,6 +30,7 @@ export const transpile = async (args, extensions) => {
     }
 
     args[0] = generate(ast);
+    console.log(args[0]);
   } catch {}
 
   return args;
@@ -63,22 +64,21 @@ const statementDispatch = {
     if (redeclarations) statement.kind = 'var';
     if (!cdn) return statement;
 
-    const [declaration] = statement.declarations;
-
     // common.js require => resolved dynamic import
+    const [declaration] = statement.declarations ?? [];
     const expr = { ...declaration?.init?.callee?.expressions?.[1] };
     if (`${expr?.object?.name}.${expr?.property?.name}` === 'global.require') {
-      const { name, properties } = declaration.id;
-      const { value } = declaration.init.arguments[0];
-      const resolved = resolveModule(value, { cdn });
+      const { name, properties } = { ...declaration.id };
+      const { value } = { ...declaration.init?.arguments?.[0] };
+      const resolved = resolveModule(value);
       return dynamicImport(resolved, { name, properties });
     }
 
     // dynamic import => resolved dynamic import
     const { object } = declaration?.init?.argument?.callee ?? {};
     if (object?.type === 'ImportExpression') {
-      const { value } = object.source;
-      object.source.value = resolveModule(value, { cdn });
+      const { value } = { ...object.source };
+      value && (object.source.value = resolveModule(value));
     }
 
     return statement;

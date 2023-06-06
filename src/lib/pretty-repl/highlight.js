@@ -1,6 +1,5 @@
-import { dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { readFileSync, realpathSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { parse } from 'css';
 import { Chalk } from 'chalk';
 import { emphasize } from 'emphasize/lib/core.js';
@@ -40,8 +39,8 @@ const initSheet = (chalk, { default: fallback, ...rest }) => {
  */
 const parseTheme = (theme, config = {}) => {
   if (!themes.has(theme)) return config;
-  const root = realpathSync(`${dirname(fileURLToPath(import.meta.url))}/../../..`);
-  const css = readFileSync(`${root}/node_modules/highlight.js/styles/${theme}.css`, 'utf-8');
+  const require = createRequire(import.meta.url);
+  const css = readFileSync(require.resolve(`highlight.js/styles/${theme}.css`), 'utf-8');
   const { rules } = parse(css).stylesheet;
   return rules.reduce((acc, { selectors, declarations }) => {
     const values = declarations

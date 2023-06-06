@@ -27,7 +27,6 @@
     "emphasize": "^6.0.0",
     "find-cache-dir": "^4.0.0",
     "highlight.js": "^11.8.0",
-    "is-builtin-module": "^3.2.1",
     "jsonfile": "^6.1.0",
     "meriyah": "^4.3.7",
     "strip-ansi": "^7.1.0",

@@ -1,5 +1,5 @@
+import { isBuiltin } from 'node:module';
 import json from 'jsonfile';
-import isBuiltinModule from 'is-builtin-module';
 import { transform } from '@esbuild-kit/core-utils';
 import { initProp } from './abstract-syntax-tree.js';
 
@@ -16,17 +16,17 @@ const tsconfig = {
 };
 
 /**  @param {Parameters<import('repl').REPLEval>} */
-export const esbuild = async ([code, _, file]) => {
+export const esbuild = async (code, file) => {
   ({ code } = await transform(code, file, tsconfig).catch(() => ({ code })));
   return code;
 };
 
 /**
  * @param {string} name
- * @param {import('repl').ReplOptions['extensions']}
+ * @param {{ cdn: boolean }}
  */
-export const resolveModule = (name, { cdn }) => {
-  if (!cdn || isBuiltinModule(name)) return name;
+export const resolveModule = (name, { cdn } = { cdn: true }) => {
+  if (!cdn || isBuiltin(name)) return name;
   const [mod, submod] = name.split('/');
   const packageJSON = json.readFileSync('package.json', { throws: false });
   const { dependencies, devDependencies } = { ...packageJSON };
@@ -46,21 +46,21 @@ export const resolveModule = (name, { cdn }) => {
  */
 // prettier-ignore
 export const staticImportReducer = (acc, { type, local, imported }) => ({
- ImportSpecifier: () => (acc.properties.push(initProp(imported, local)), acc),
- ImportDefaultSpecifier: () => ((acc.name = local.name), acc),
- ImportNamespaceSpecifier() {
-   if (acc.name) {
-     // move global assignment of already used default import
-     // to destructured property import, i.e. `({ default: name } = ...)`
-     acc.properties.push(
-       initProp({ type: 'Identifier', name: 'default' }, { type: 'Identifier', name: acc.name })
-     );
+  ImportSpecifier: () => (acc.properties.push(initProp(imported, local)), acc),
+  ImportDefaultSpecifier: () => ((acc.name = local.name), acc),
+  ImportNamespaceSpecifier() {
+    if (acc.name) {
+      // move global assignment of already used default import
+      // to destructured property import, i.e. `({ default: name } = ...)`
+      acc.properties.push(
+        initProp({ type: 'Identifier', name: 'default' }, { type: 'Identifier', name: acc.name })
+      );
+    }
 
-     // replace the name and value to be assigned
-     // from the default import to the namespace import
-     acc.name = local.name;
-     acc.assignment = acc.assignment.right;
-     return acc;
-   }
- },
+    // replace the name and value to be assigned
+    // from the default import to the namespace import
+    acc.name = local.name;
+    acc.assignment = acc.assignment.right;
+    return acc;
+  },
 }[type]?.());
