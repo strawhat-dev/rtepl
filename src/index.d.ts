@@ -14,7 +14,9 @@ declare module 'repl' {
   }
 }
 
-export default repl;
+declare const rtepl: repl;
+
+export default rtepl;
 
 // https://github.com/highlightjs/highlight.js/blob/main/docs/css-classes-reference.rst
 export type Style = ColorName | ModifierName | `#${string}`;
