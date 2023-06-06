@@ -2,12 +2,19 @@
   "name": "rtepl",
   "license": "MIT",
   "version": "0.0.0",
+  "author": "strawhat-dev",
+  "repository": "github:strawhat-dev/rtepl",
+  "description": "Read-[transpile]-Eval-Print-Loop w/ syntax highlighting",
   "type": "module",
+  "sideEffects": false,
   "module": "./src/index.js",
   "exports": "./src/index.js",
   "bin": {
     "rtepl": "./src/cli.js"
   },
+  "files": [
+    "src"
+  ],
   "engines": {
     "node": ">=16.6.0"
   },
@@ -18,10 +25,10 @@
     "chalk": "^5.2.0",
     "css": "^3.0.0",
     "emphasize": "^6.0.0",
+    "find-cache-dir": "^4.0.0",
     "highlight.js": "^11.8.0",
     "is-builtin-module": "^3.2.1",
     "jsonfile": "^6.1.0",
-    "lodash.get": "^4.4.2",
     "meriyah": "^4.3.7",
     "strip-ansi": "^7.1.0",
     "uuid": "^9.0.0"
@@ -29,12 +36,15 @@
   "devDependencies": {
     "@types/css": "^0.0.33",
     "@types/eslint": "^8.40.0",
+    "@types/find-cache-dir": "^3.2.1",
     "@types/jsonfile": "^6.1.1",
-    "@types/lodash.get": "^4.4.7",
     "@types/node": "^20.2.5",
     "@types/uuid": "^9.0.1",
     "eslint": "^8.42.0",
     "prettier": "^2.8.8"
+  },
+  "np": {
+    "branch": "main"
   },
   "prettier": {
     "printWidth": 100,

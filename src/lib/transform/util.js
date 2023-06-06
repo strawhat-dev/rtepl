@@ -16,8 +16,8 @@ const tsconfig = {
 };
 
 /**  @param {Parameters<import('repl').REPLEval>} */
-export const esbuild = async ([cmd, _, file]) => {
-  const { code } = await transform(cmd, file, tsconfig).catch(() => ({ code }));
+export const esbuild = async ([code, _, file]) => {
+  ({ code } = await transform(code, file, tsconfig).catch(() => ({ code })));
   return code;
 };
 

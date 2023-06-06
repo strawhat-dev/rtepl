@@ -1,3 +1,4 @@
+/* eslint-disable no-empty */
 import { parse } from 'meriyah';
 import { generate } from 'astring';
 import { esbuild, resolveModule, staticImportReducer } from './util.js';
@@ -19,15 +20,18 @@ export const transpile = async (args, extensions) => {
   const { typescript, ...opts } = { ...extensionDefaults, ...extensions };
   typescript && (args[0] = await esbuild(args));
   if (!Object.values(opts).some((enabled) => enabled)) return args;
-  const ast = parse(args[0], { module: true, next: true });
-  const { body } = ast;
-  for (let i = 0; i < body.length; ++i) {
-    const { type } = body[i];
-    const handleStatement = statementDispatch[type];
-    handleStatement && (body[i] = handleStatement(body[i], opts));
-  }
+  try {
+    const ast = parse(args[0], { module: true, next: true });
+    const { body } = ast;
+    for (let i = 0; i < body.length; ++i) {
+      const { type } = body[i];
+      const handleStatement = statementDispatch[type];
+      handleStatement && (body[i] = handleStatement(body[i], opts));
+    }
 
-  args[0] = generate(ast);
+    args[0] = generate(ast);
+  } catch {}
+
   return args;
 };
 
@@ -61,7 +65,7 @@ const statementDispatch = {
 
     const [declaration] = statement.declarations;
 
-    // common.js require => dynamic import
+    // common.js require => resolved dynamic import
     const expr = { ...declaration?.init?.callee?.expressions?.[1] };
     if (`${expr?.object?.name}.${expr?.property?.name}` === 'global.require') {
       const { name, properties } = declaration.id;
@@ -70,7 +74,7 @@ const statementDispatch = {
       return dynamicImport(resolved, { name, properties });
     }
 
-    // resolve dynamic import
+    // dynamic import => resolved dynamic import
     const { object } = declaration?.init?.argument?.callee ?? {};
     if (object?.type === 'ImportExpression') {
       const { value } = object.source;
