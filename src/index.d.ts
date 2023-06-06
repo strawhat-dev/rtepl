@@ -1,6 +1,8 @@
 import type repl from 'node:repl';
 import type { ColorName, ModifierName } from 'chalk';
 
+type REPL = typeof repl;
+declare const rtepl: REPL;
 declare module 'repl' {
   interface ReplOptions extends repl.ReplOptions {
     theme?: Theme;
@@ -14,14 +16,14 @@ declare module 'repl' {
   }
 }
 
-export default typeof repl;
-export declare const start: typeof repl.start;
-export declare const writer: typeof repl.writer;
-export declare const REPLServer: typeof repl.REPLServer;
-export declare const REPL_MODE_SLOPPY: typeof repl.REPL_MODE_SLOPPY;
-export declare const REPL_MODE_STRICT: typeof repl.REPL_MODE_STRICT;
+export default rtepl;
+export declare const start: REPL['start'];
+export declare const writer: REPL['writer'];
+export declare const REPLServer: REPL['REPLServer'];
+export declare const REPL_MODE_SLOPPY: REPL['REPL_MODE_SLOPPY'];
+export declare const REPL_MODE_STRICT: REPL['REPL_MODE_STRICT'];
 
-// https://github.com/highlightjs/highlight.js/blob/main/docs/css-classes-reference.rst
+export type * from 'node:repl';
 export type Style = ColorName | ModifierName | `#${string}`;
 export type SheetConfig = {
   [className: string]: Style | Style[];
@@ -287,7 +289,7 @@ export type SheetConfig = {
   deletion: Style | Style[];
 };
 
-type Theme =
+export type Theme =
   | 'a11y-dark'
   | 'a11y-light'
   | 'agate'
