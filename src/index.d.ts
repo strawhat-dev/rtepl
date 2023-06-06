@@ -1,8 +1,8 @@
+import type repl from 'node:repl';
 import type { ColorName, ModifierName } from 'chalk';
-import type { ReplOptions as NodeReplOptions } from 'node:repl';
 
 declare module 'repl' {
-  interface ReplOptions extends NodeReplOptions {
+  interface ReplOptions extends repl.ReplOptions {
     theme?: Theme;
     sheet?: Partial<SheetConfig>;
     extensions?: {
@@ -14,9 +14,11 @@ declare module 'repl' {
   }
 }
 
+export default repl;
+
 // https://github.com/highlightjs/highlight.js/blob/main/docs/css-classes-reference.rst
-type Style = ColorName | ModifierName | `#${string}`;
-type SheetConfig = {
+export type Style = ColorName | ModifierName | `#${string}`;
+export type SheetConfig = {
   [className: string]: Style | Style[];
 
   /**
