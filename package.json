@@ -1,0 +1,43 @@
+{
+  "name": "rtepl",
+  "license": "MIT",
+  "version": "0.0.0",
+  "type": "module",
+  "module": "./src/index.js",
+  "exports": "./src/index.js",
+  "bin": {
+    "rtepl": "./src/cli.js"
+  },
+  "engines": {
+    "node": ">=16.6.0"
+  },
+  "dependencies": {
+    "@esbuild-kit/core-utils": "^3.1.0",
+    "ansi-regex": "^6.0.1",
+    "astring": "^1.8.6",
+    "chalk": "^5.2.0",
+    "css": "^3.0.0",
+    "emphasize": "^6.0.0",
+    "highlight.js": "^11.8.0",
+    "is-builtin-module": "^3.2.1",
+    "jsonfile": "^6.1.0",
+    "lodash.get": "^4.4.2",
+    "meriyah": "^4.3.7",
+    "strip-ansi": "^7.1.0",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/css": "^0.0.33",
+    "@types/eslint": "^8.40.0",
+    "@types/jsonfile": "^6.1.1",
+    "@types/lodash.get": "^4.4.7",
+    "@types/node": "^20.2.5",
+    "@types/uuid": "^9.0.1",
+    "eslint": "^8.42.0",
+    "prettier": "^2.8.8"
+  },
+  "prettier": {
+    "printWidth": 100,
+    "singleQuote": true
+  }
+}
