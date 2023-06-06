@@ -12,10 +12,10 @@ export const initREPL = (options = {}) => {
   const { start } = repl;
   repl.start = ({ extensions, ...serverConfig } = options) => {
     const server = start(serverConfig);
-    const cache = findCacheDir({ name: 'rtepl', create: true, thunk: true });
-    server.setupHistory(cache('.node_repl_history'), (err) => err && console.error(err));
     const { eval: $ } = { ...server };
     server.eval = async (...args) => $(...(await transpile(args, extensions)));
+    const cache = findCacheDir({ name: 'rtepl', create: true, thunk: true });
+    server.setupHistory(cache('.node_repl_history'), (err) => err && console.error(err));
     return server;
   };
 
