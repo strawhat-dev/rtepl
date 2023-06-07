@@ -18,7 +18,7 @@ export const initHighlighter = ({ output, theme, sheet: config }) => {
 
 /**
  * @param {import('chalk').ChalkInstance} chalk
- * @param {import('repl').ReplOptions['theme']} config
+ * @param {import('repl').ReplOptions['sheet']}
  */
 const initSheet = (chalk, { default: fallback, ...rest }) => {
   fallback && (chalk = fallback.startsWith?.('#') ? chalk.hex(fallback) : chalk[fallback] || chalk);
@@ -39,10 +39,11 @@ const initSheet = (chalk, { default: fallback, ...rest }) => {
  */
 const parseTheme = (theme, config = {}) => {
   if (!themes.has(theme)) return config;
-  const require = createRequire(import.meta.url);
-  const css = readFileSync(require.resolve(`highlight.js/styles/${theme}.css`), 'utf-8');
+  const { resolve } = createRequire(import.meta.url);
+  const css = readFileSync(resolve(`highlight.js/styles/${theme}.css`), 'utf-8');
   const { rules } = parse(css).stylesheet;
   return rules.reduce((acc, { selectors, declarations }) => {
+    if (!selectors || !declarations) return acc;
     const values = declarations
       .filter(({ property }) => supportedProps.includes(property))
       .map(({ property, value }) => (property === 'font-weight' && +value > 400 ? 'bold' : value));

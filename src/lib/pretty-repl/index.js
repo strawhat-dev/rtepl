@@ -16,6 +16,7 @@ const BRACKETS = '()[]{}\'"`$';
 
 // https://github.com/mongodb-js/pretty-repl/blob/master/lib/pretty-repl.js
 class REPLServer extends repl.REPLServer {
+  /** @param {import('node:repl').ReplOptions} options */
   constructor(options = {}) {
     super(options);
     options.output ??= process.stdout;
