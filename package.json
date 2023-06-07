@@ -10,11 +10,12 @@
   "module": "./src/index.js",
   "exports": "./src/index.js",
   "types": "./src/index.d.ts",
-  "bin": {
-    "rtepl": "./src/cli.js"
+  "directories": {
+    "bin": "./bin"
   },
   "files": [
-    "src"
+    "src",
+    "bin"
   ],
   "engines": {
     "node": ">=16.6.0"
