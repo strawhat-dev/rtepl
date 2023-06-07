@@ -4,33 +4,24 @@ import { generate } from 'astring';
 import { esbuild, resolveModule, staticImportReducer } from './util.js';
 import { dynamicImport, resolvedChain } from './abstract-syntax-tree.js';
 
-/** @type {import('repl').ReplOptions['extensions']} */
-const extensionDefaults = {
-  cdn: true,
-  typescript: true,
-  staticImports: true,
-  redeclarations: true,
-};
-
 /**
  * @param {Parameters<import('repl').REPLEval>} args
  * @param {import('repl').ReplOptions['extensions']} extensions
  */
 export const transpile = async (args, extensions) => {
-  const { typescript, ...opts } = { ...extensionDefaults, ...extensions };
+  const { typescript, ...opts } = { ...extensions };
   typescript && (args[0] = await esbuild(args[0], args[2]));
   if (!Object.values(opts).some((enabled) => enabled)) return args;
   try {
     const ast = parse(args[0], { module: true, next: true });
     const { body } = ast;
     for (let i = 0; i < body.length; ++i) {
-      const { type } = body[i];
-      const handleStatement = statementDispatch[type];
-      handleStatement && (body[i] = handleStatement(body[i], opts));
+      const statement = body[i];
+      const handleStatement = statementDispatch[statement?.type];
+      handleStatement && (body[i] = handleStatement(statement, opts));
     }
 
     args[0] = generate(ast);
-    console.log(args[0]);
   } catch {}
 
   return args;
@@ -56,29 +47,26 @@ const statementDispatch = {
       properties: [],
     });
 
-    const { value } = source;
-    const resolved = resolveModule(value, { cdn });
-    return dynamicImport(resolved, { name, assignment, properties });
+    return dynamicImport(resolveModule(source.value, { cdn }), { name, assignment, properties });
   },
   VariableDeclaration(statement, { cdn, redeclarations }) {
-    if (redeclarations) statement.kind = 'var';
-    if (!cdn) return statement;
+    if (redeclarations) statement['kind'] = 'var';
+    const [declaration] = statement['declarations'] || [];
+    if (!cdn || !declaration) return statement;
 
     // common.js require => resolved dynamic import
-    const [declaration] = statement.declarations ?? [];
-    const expr = { ...declaration?.init?.callee?.expressions?.[1] };
-    if (`${expr?.object?.name}.${expr?.property?.name}` === 'global.require') {
-      const { name, properties } = { ...declaration.id };
-      const { value } = { ...declaration.init?.arguments?.[0] };
-      const resolved = resolveModule(value);
-      return dynamicImport(resolved, { name, properties });
+    const { object, property } = declaration.init?.callee?.expressions?.[1] || {};
+    if (`${object?.name}.${property?.name}` === 'global.require') {
+      const { name, properties } = declaration.id || {};
+      const { value } = declaration.init.arguments?.[0] || {};
+      if (value) return dynamicImport(resolveModule(value), { name, properties });
     }
 
     // dynamic import => resolved dynamic import
-    const { object } = declaration?.init?.argument?.callee ?? {};
-    if (object?.type === 'ImportExpression') {
-      const { value } = { ...object.source };
-      value && (object.source.value = resolveModule(value));
+    const { callee } = declaration.init?.argument || {};
+    if (callee?.object?.type === 'ImportExpression') {
+      const { value } = callee.object.source || {};
+      value && (callee.object.source['value'] = resolveModule(value));
     }
 
     return statement;
