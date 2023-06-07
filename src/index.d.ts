@@ -27,6 +27,8 @@ declare module 'repl' {
        * Automatically use a cdn for all imports, unless:
        * - the imported module is a node builtin
        * - the module can be resolved from the current working directory
+       *
+       * Note: `--experimental-network-imports` flag must be enabled
        */
       cdn?: boolean;
       /**

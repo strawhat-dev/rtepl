@@ -1,7 +1,7 @@
 {
   "name": "rtepl",
   "license": "MIT",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "author": "strawhat-dev",
   "repository": "github:strawhat-dev/rtepl",
   "description": "Read-[transpile]-Eval-Print-Loop w/ syntax highlighting",
@@ -10,12 +10,9 @@
   "module": "./src/index.js",
   "exports": "./src/index.js",
   "types": "./src/index.d.ts",
-  "directories": {
-    "bin": "./bin"
-  },
+  "bin": "./src/cli.js",
   "files": [
-    "src",
-    "bin"
+    "src"
   ],
   "engines": {
     "node": ">=16.6.0"

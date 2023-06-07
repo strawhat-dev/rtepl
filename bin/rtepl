@@ -1,3 +1,0 @@
-#!/bin/sh
-root="$(realpath "$(dirname "$0")/..")"
-exec node --experimental-network-imports --no-warnings "$root/src/cli.js" "$@"
