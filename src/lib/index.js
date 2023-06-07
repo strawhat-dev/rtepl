@@ -17,7 +17,6 @@ export const initREPL = (options = {}) => {
     stream.isTTY && (serverConfig.prompt ??= chalk.green('> '));
     const server = start(serverConfig);
     const { eval: $ } = { ...server };
-    const cache = findCacheDir({ name: 'rtepl', create: true, thunk: true });
     server.eval = async (...args) => $(...(await transpile(args, extensions)));
     server.setupHistory(cache('.node_repl_history'), (err) => err && console.error(err));
     return server;
@@ -25,6 +24,8 @@ export const initREPL = (options = {}) => {
 
   return repl;
 };
+
+const cache = findCacheDir({ name: 'rtepl', create: true, thunk: true });
 
 /** @type {REPL.ReplOptions}  */
 const defaultConfig = {

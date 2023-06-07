@@ -5,13 +5,46 @@ type REPL = typeof repl;
 declare const rtepl: REPL;
 declare module 'repl' {
   interface ReplOptions extends repl.ReplOptions {
+    /**
+     * The name of the theme to use (provided by `hljs` stylesheets).
+     * @defaultValue `'atom-one-dark'`
+     */
     theme?: Theme;
+    /**
+     * A configuration object that maps `hljs` classes
+     * to a single or array of `chalk` color/modifier names *(or hex values)*,
+     * for more advanced customization of syntax styling.
+     * - Can be used in conjunction with the `theme` option, which will be merged.
+     */
     sheet?: Partial<SheetConfig>;
+    /**
+     * Extensions that affect transpilation and transpiles commands that would normally be invalid
+     * in a repl context to valid equivalents, allowing for flexibility and quickly testing code.
+     * @defaultValue all options are `true` by default, unless a user defined `extensions` object is explicitly given
+     */
     extensions?: {
+      /**
+       * Automatically use a cdn for all imports, unless:
+       * - the imported module is a node builtin
+       * - the module can be resolved from the current working directory
+       */
       cdn?: boolean;
-      typescript?: boolean;
-      staticImports?: boolean;
+      /**
+       * Similarily to the DevTools console, allow redeclaring `let` & `const`.
+       * *(Converts all unscoped declarations to `var`)*
+       */
       redeclarations?: boolean;
+      /**
+       * Allow for static import syntax,
+       * which will be converted to dynamic imports if enabled.
+       */
+      staticImports?: boolean;
+      /**
+       * Enable transpiling typescript with esbuild.
+       * - Note: Unlike `ts-node`'s repl, this does **not**
+       *   perform any typechecking (similarly to `tsx`).
+       */
+      typescript?: boolean;
     };
   }
 }
