@@ -18,14 +18,16 @@ export const initREPL = (options = {}) => {
     const server = start(serverConfig);
     const { eval: $ } = { ...server };
     server.eval = async (...args) => $(...(await transpile(args, extensions)));
-    server.setupHistory(cache('.node_repl_history'), (err) => err && console.error(err));
+    const cache = findCacheDir({ name: 'rtepl', create: true });
+    if (cache) {
+      server.setupHistory(`${cache}/.node_repl_history`, (err) => err && console.error(err));
+    }
+
     return server;
   };
 
   return repl;
 };
-
-const cache = findCacheDir({ name: 'rtepl', create: true, thunk: true });
 
 /** @type {REPL.ReplOptions}  */
 const defaultConfig = {
