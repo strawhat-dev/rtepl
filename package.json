@@ -1,7 +1,7 @@
 {
   "name": "rtepl",
   "license": "MIT",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "author": "strawhat-dev",
   "repository": "github:strawhat-dev/rtepl",
   "description": "Read-[transpile]-Eval-Print-Loop w/ syntax highlighting",
