@@ -6,38 +6,38 @@
   "repository": "github:strawhat-dev/rtepl",
   "description": "Read-[transpile]-Eval-Print-Loop w/ syntax highlighting",
   "type": "module",
-  "sideEffects": false,
+  "bin": "./src/cli.js",
   "module": "./src/index.js",
   "exports": "./src/index.js",
   "types": "./src/index.d.ts",
-  "bin": "./src/cli.js",
   "files": [
     "src"
   ],
   "engines": {
     "node": ">=16.6.0"
   },
+  "scripts": {
+    "start": "node --experimental-network-imports --no-warnings ./src/cli.js"
+  },
   "dependencies": {
+    "@adobe/css-tools": "^4.3.0-beta.2",
     "@esbuild-kit/core-utils": "^3.1.0",
     "ansi-regex": "^6.0.1",
     "astring": "^1.8.6",
     "chalk": "^5.2.0",
-    "css": "^3.0.0",
     "emphasize": "^6.0.0",
     "find-cache-dir": "^4.0.0",
     "highlight.js": "^11.8.0",
-    "jsonfile": "^6.1.0",
+    "ink": "^4.2.0",
     "meriyah": "^4.3.7",
     "strip-ansi": "^7.1.0",
-    "uuid": "^9.0.0"
+    "yargs-parser": "^21.1.1"
   },
   "devDependencies": {
-    "@types/css": "^0.0.33",
-    "@types/eslint": "^8.40.0",
+    "@types/eslint": "^8.40.1",
     "@types/find-cache-dir": "^3.2.1",
-    "@types/jsonfile": "^6.1.1",
     "@types/node": "^20.2.5",
-    "@types/uuid": "^9.0.1",
+    "@types/yargs-parser": "^21.0.0",
     "eslint": "^8.42.0",
     "prettier": "^2.8.8"
   },
