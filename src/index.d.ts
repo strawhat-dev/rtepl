@@ -6,7 +6,13 @@ declare const rtepl: REPL;
 declare module 'repl' {
   interface ReplOptions extends repl.ReplOptions {
     /**
+     * **Close** the repl on `SIGINT` (`Ctrl` + `c`).
+     * @defaultValue `true`
+     */
+    closeOnSigint?: boolean;
+    /**
      * The name of the theme to use (provided by `hljs` stylesheets).
+     * @see {@link https://github.com/highlightjs/highlight.js/tree/main/src/styles}
      * @defaultValue `'atom-one-dark'`
      */
     theme?: Theme;
@@ -18,27 +24,37 @@ declare module 'repl' {
      */
     sheet?: Partial<SheetConfig>;
     /**
+     * Define commands to be handled with a custom callback instead of the repl server when a matching command occurs.
+     * - Note: Differs from commands defined by the native `repl.defineCommand`, in that the `'.'` prefix is not needed.
+     * @example
+     * repl.start({
+     *   commands: {
+     *     clear: ({ repl }) => repl.write(null, { ctrl: true, name: 'l' })
+     *   }
+     * })
+     */
+    commands?: { [command: string]: CommandHandler };
+    /**
      * Extensions that affect transpilation and transpiles commands that would normally be invalid
      * in a repl context to valid equivalents, allowing for flexibility and quickly testing code.
-     * @defaultValue all options are `true` by default, unless a user defined `extensions` object is explicitly given
+     * @defaultValue All options are `true` by default, unless `extensions` is explicitly configured and overridden by the user.
      */
     extensions?: {
       /**
-       * Automatically use a cdn for all imports, unless:
-       * - the imported module is a node builtin
-       * - the module can be resolved from the current working directory
-       *
-       * Note: `--experimental-network-imports` flag must be enabled
+       * Automatically use a cdn (jsdelivr) for all imports when
+       * the imported module is not a node builtin, or the module
+       * cannot be resolved from the current working directory.
+       * - Note: `--experimental-network-imports` flag must be **enabled**
        */
       cdn?: boolean;
       /**
-       * Similarily to the DevTools console, allow redeclaring `let` & `const`.
+       * Similarily to the DevTools console, allow redeclaring `let` & `const`.\
        * *(Converts all unscoped declarations to `var`)*
        */
       redeclarations?: boolean;
       /**
        * Allow for static import syntax,
-       * which will be converted to dynamic imports if enabled.
+       * which will be converted to *dynamic imports* if enabled.
        */
       staticImports?: boolean;
       /**
@@ -59,6 +75,18 @@ export declare const REPL_MODE_SLOPPY: REPL['REPL_MODE_SLOPPY'];
 export declare const REPL_MODE_STRICT: REPL['REPL_MODE_STRICT'];
 
 export type * from 'node:repl';
+export type CommandHandler = (cmd: CommandEvent) => void;
+export type CommandEvent = {
+  /** The current `repl` server instance. */
+  repl: REPL['REPLServer'];
+  /** An array of parsed arguments passed to the command. */
+  argv: string[];
+  /** The unparsed args string containing everything after the command itself. */
+  args: string;
+  /** The full command string. */
+  command: string;
+};
+
 export type Style = ColorName | ModifierName | `#${string}`;
 export type SheetConfig = {
   [className: string]: Style | Style[];
