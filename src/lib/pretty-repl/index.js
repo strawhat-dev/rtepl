@@ -36,7 +36,7 @@ class REPLServer extends repl.REPLServer {
     const cursorWasOnBracket = BRACKETS.includes(this.line[this.cursor]);
     super._moveCursor(dx);
     const cursorIsOnBracket = BRACKETS.includes(this.line[this.cursor]);
-    if (cursorWasOnBracket || cursorIsOnBracket) this._refreshLine();
+    (cursorWasOnBracket || cursorIsOnBracket) && this._refreshLine();
   }
 
   // When refreshinng the whole line,
@@ -67,7 +67,7 @@ class REPLServer extends repl.REPLServer {
     // a string to the end of the current line.
     if (
       this.lineBeforeInsert !== undefined &&
-      this.lineBeforeInsert + stringToWrite === this.line
+      `${this.lineBeforeInsert}${stringToWrite}` === this.line
     ) {
       this._writeAppendedString(stringToWrite);
     } else if (stringToWrite.startsWith(this._prompt)) {
@@ -93,7 +93,7 @@ class REPLServer extends repl.REPLServer {
     // `lineBeforeInsert + stringToWrite === line` implies that
     // `simplified       + stringToWrite` is a valid simplification of `line`,
     // and the former is a precondition for this method to be called).
-    const after = this._doColorize(simplified + stringToWrite);
+    const after = this._doColorize(`${simplified}${stringToWrite}`);
 
     // Find the first character or escape sequence that differs in `before` and `after`.
     const commonPrefixLength = computeCommonPrefixLength(before, after);
@@ -110,12 +110,12 @@ class REPLServer extends repl.REPLServer {
     // This helps reduce the amount of useless clutter we write a bit, and in
     // particular helps the mongosh test suite not ReDOS itself when verifying
     // output coloring.
-    const lastForegroundColorReset = ansiStatements.lastIndexOf('\x1b[39m');
-    if (lastForegroundColorReset !== -1) {
+    const lastForegroundColorResetIndex = ansiStatements.lastIndexOf('\x1b[39m');
+    if (lastForegroundColorResetIndex !== -1) {
       // Keep escape sequences that come after the last full reset or modify
       // something other than the foreground color.
       ansiStatements = ansiStatements.filter(
-        (sequence, index) => index > lastForegroundColorReset || !sequence.match(/^\x1b\[3\d.*m$/)
+        (sequence, i) => i > lastForegroundColorResetIndex || !sequence.match(/^\x1b\[3\d.*m$/)
       );
     }
 
@@ -128,7 +128,7 @@ class REPLServer extends repl.REPLServer {
     // all the escape sequences that were present before, and then apply the
     // new output from `after`.
     this.output.write(
-      '\b'.repeat(backtrackLength) + ansiStatements.join('') + after.slice(commonPrefixLength)
+      `${'\b'.repeat(backtrackLength)}${ansiStatements.join('')}${after.slice(commonPrefixLength)}`
     );
   }
 
@@ -144,16 +144,11 @@ class REPLServer extends repl.REPLServer {
       // highlighting using BOM characters (because it seems safe to assume
       // that they are ignored by highlighting) so that we can remember where
       // the bracket was.
-      // prettier-ignore
-      stringToWrite = (
-        stringToWrite.substring(0, this.highlightBracketPosition) +
-        '\ufeff' +
-        stringToWrite[this.highlightBracketPosition] +
-        '\ufeff' +
-        stringToWrite.substring(this.highlightBracketPosition + 1)
+      stringToWrite = this._doColorize(
+        `${stringToWrite.substring(0, this.highlightBracketPosition)}\ufeff${
+          stringToWrite[this.highlightBracketPosition]
+        }\ufeff${stringToWrite.substring(this.highlightBracketPosition + 1)}`
       );
-
-      stringToWrite = this._doColorize(stringToWrite);
 
       // Then remove the BOM characters again and colorize the bracket in between.
       stringToWrite = stringToWrite.replace(/\ufeff(.+)\ufeff/, (_, bracket) =>
@@ -161,7 +156,7 @@ class REPLServer extends repl.REPLServer {
       );
     } else stringToWrite = this._doColorize(stringToWrite);
 
-    this.output.write(this._prompt + stringToWrite);
+    this.output.write(`${this._prompt}${stringToWrite}`);
   }
 
   // prettier-ignore
@@ -193,7 +188,7 @@ class REPLServer extends repl.REPLServer {
       const { parent } = brackets[i];
       // Skip brackets which are contained in outer brackets that will also be removed.
       if (parent && parent.end !== -1) continue;
-      str = str.substr(0, brackets[i].start) + str.substr(brackets[i].end + 1);
+      str = `${str.substr(0, brackets[i].start)}${str.substr(brackets[i].end + 1)}`;
     }
 
     return str;
