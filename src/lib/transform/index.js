@@ -1,8 +1,14 @@
-/* eslint-disable no-empty */
 import { parse } from 'meriyah';
 import { generate } from 'astring';
-import { esbuild, resolveModule, staticImportReducer } from './util.js';
-import { dynamicImport, resolvedChain } from './abstract-syntax-tree.js';
+import { esbuild, getImportDeclaration, shouldSkipParsing, staticImportReducer } from './util.js';
+
+/** @type {import('meriyah').Options} */
+const parserOptions = {
+  jsx: true,
+  next: true,
+  module: true,
+  specDeviation: true,
+};
 
 /**
  * @param {Parameters<import('repl').REPLEval>} args
@@ -10,19 +16,19 @@ import { dynamicImport, resolvedChain } from './abstract-syntax-tree.js';
  */
 export const transpile = async (args, extensions) => {
   const { typescript, ...opts } = { ...extensions };
-  typescript && (args[0] = await esbuild(args[0], args[2]));
-  if (!Object.values(opts).some((enabled) => enabled)) return args;
+  if (typescript) args[0] = await esbuild(args[0], args[2]);
+  if (shouldSkipParsing(args[0], opts)) return args;
   try {
-    const ast = parse(args[0], { module: true, next: true });
-    const { body } = ast;
+    const ast = parse(args[0], parserOptions);
+    const body = ast.body;
     for (let i = 0; i < body.length; ++i) {
       const statement = body[i];
-      const handleStatement = statementDispatch[statement?.type];
-      handleStatement && (body[i] = handleStatement(statement, opts));
+      const transformStatement = statementDispatch[statement?.type];
+      transformStatement && (body[i] = transformStatement(statement, opts));
     }
 
     args[0] = generate(ast);
-  } catch {}
+  } catch (_) {}
 
   return args;
 };
@@ -41,32 +47,29 @@ const statementDispatch = {
   ImportDeclaration(statement, { cdn, staticImports }) {
     if (!staticImports) return statement;
     const { source, specifiers } = statement;
-    const { name, assignment, properties } = specifiers.reduce(staticImportReducer, {
-      name: undefined,
-      assignment: resolvedChain,
-      properties: [],
-    });
-
-    return dynamicImport(resolveModule(source.value, { cdn }), { name, assignment, properties });
+    const subtreeProps = specifiers?.reduce(staticImportReducer, {});
+    return getImportDeclaration(source?.value, subtreeProps, cdn);
   },
   VariableDeclaration(statement, { cdn, redeclarations }) {
-    if (redeclarations) statement['kind'] = 'var';
     const [declaration] = statement['declarations'] || [];
+    if (redeclarations) statement['kind'] = 'var';
     if (!cdn || !declaration) return statement;
-
-    // common.js require => resolved dynamic import
-    const { object, property } = declaration.init?.callee?.expressions?.[1] || {};
-    if (`${object?.name}.${property?.name}` === 'global.require') {
-      const { name, properties } = declaration.id || {};
-      const { value } = declaration.init.arguments?.[0] || {};
-      if (value) return dynamicImport(resolveModule(value), { name, properties });
+    const { id, init } = declaration;
+    const { name, expressions } = init?.callee ?? {};
+    let { object, property } = expressions?.[1] ?? {};
+    const transpiledName = `${object?.name}.${property?.name}`;
+    if (name === 'require' || transpiledName === 'global.require') {
+      // common.js require -> resolved dynamic import
+      const [{ value }] = init.arguments;
+      return getImportDeclaration(value, id);
     }
 
-    // dynamic import => resolved dynamic import
-    const { callee } = declaration.init?.argument || {};
-    if (callee?.object?.type === 'ImportExpression') {
-      const { value } = callee.object.source || {};
-      value && (callee.object.source['value'] = resolveModule(value));
+    const { argument } = init ?? {};
+    ({ object } = argument?.callee ?? {});
+    if ([argument?.type, object?.type].some((t) => t === 'ImportExpression')) {
+      // dynamic import -> resolved dynamic import
+      const { value } = { ...argument?.source, ...object?.source };
+      return getImportDeclaration(value, id);
     }
 
     return statement;

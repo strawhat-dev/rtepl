@@ -1,16 +1,21 @@
-import { isBuiltin } from 'node:module';
-import json from 'jsonfile';
+import chalk from 'chalk';
+import { createRequire, isBuiltin } from 'node:module';
 import { transform } from '@esbuild-kit/core-utils';
-import { initProp } from './abstract-syntax-tree.js';
+import {
+  dynamicImportDeclaration,
+  initProp,
+  resolvedImportDeclaration,
+} from './abstract-syntax-tree.js';
 
 // https://github.com/esbuild-kit/tsx/blob/develop/src/patch-repl.ts
 /** @type {Parameters<typeof transform>[2]} */
 const tsconfig = {
   minify: false,
-  loader: 'ts',
+  loader: 'tsx',
   format: 'esm',
-  target: 'esnext',
-  platform: 'node',
+  platform: 'neutral',
+  target: 'node16',
+  jsx: 'automatic',
   define: { require: 'global.require' },
   tsconfigRaw: { compilerOptions: { preserveValueImports: true } },
 };
@@ -22,45 +27,80 @@ export const esbuild = async (code, file) => {
 };
 
 /**
- * @param {string} name
- * @param {{ cdn: boolean }}
+ * @param {string} code
+ * @param {import('repl').ReplOptions['extensions']} opts
  */
-export const resolveModule = (name, { cdn } = { cdn: true }) => {
-  if (!cdn || isBuiltin(name)) return name;
-  const [mod, submod] = name.split('/');
-  const packageJSON = json.readFileSync('package.json', { throws: false });
-  const { dependencies, devDependencies } = { ...packageJSON };
-  const modules = Object.keys({ ...dependencies, ...devDependencies });
-  if (modules.includes(mod) || modules.includes(`${mod}/${submod}`)) return name;
-  return `https://cdn.jsdelivr.net/npm/${name}/+esm`;
+// prettier-ignore
+export const shouldSkipParsing = (code, opts) => (
+  !Object.values(opts).some((enabled) => enabled) || // naive check
+  !['let', 'const', 'import', 'require'].some((keyword) => code.includes(keyword))
+);
+
+/**
+ * @param {string} name
+ * @param {object} props
+ */
+export const getImportDeclaration = (name, props, cdn = true) => {
+  if (globalThis['cdn_imports']?.has(name)) {
+    return resolvedImportDeclaration(globalThis['cdn_imports']?.get(name), props);
+  }
+
+  const resolved = resolveModule(name, cdn);
+  return dynamicImportDeclaration(resolved, props);
 };
 
 /**
  * @param {{
  *   name?: string,
- *   assignment: typeof resolvedChain,
- *   properties: ReturnType<typeof initProp>[]
+ *   properties?: ReturnType<typeof initProp>[],
+ *   assignment: import('meriyah').ESTree.LogicalExpression,
  * }} acc
  *
  * @param {import('meriyah').ESTree.ImportClause}
  */
 // prettier-ignore
 export const staticImportReducer = (acc, { type, local, imported }) => ({
-  ImportSpecifier: () => (acc.properties.push(initProp(imported, local)), acc),
-  ImportDefaultSpecifier: () => ((acc.name = local.name), acc),
+  ImportSpecifier() {
+    acc['properties'] ??= [];
+    acc.properties.push(initProp(imported.name, local.name));
+    return acc;
+  },
+  ImportDefaultSpecifier() {
+    acc['name'] = local.name;
+    return acc;
+  },
   ImportNamespaceSpecifier() {
-    if (acc.name) {
+    if (acc['name']) {
       // move global assignment of already used default import
       // to destructured property import, i.e. `({ default: name } = ...)`
-      acc.properties.push(
-        initProp({ type: 'Identifier', name: 'default' }, { type: 'Identifier', name: acc.name })
-      );
+      acc['properties'] ??= [];
+      acc.properties.push(initProp('default', acc.name));
     }
 
     // replace the name and value to be assigned
     // from the default import to the namespace import
-    acc.name = local.name;
-    acc.assignment = acc.assignment.right;
+    acc['name'] = local.name;
     return acc;
   },
 }[type]?.());
+
+/**
+ * @param {string} name
+ * @param {boolean} cdn
+ */
+const resolveModule = (name, cdn) => {
+  if (!cdn || isBuiltin(name) || name.startsWith('.') || name.startsWith('https:')) return name;
+  let resolved = `https://cdn.jsdelivr.net/npm/${name}/+esm`;
+  try {
+    const require = createRequire(`${process.cwd()}/index.js`);
+    if (require.resolve(name)) resolved = name;
+  } catch (_) {}
+
+  if (resolved !== name) {
+    globalThis['cdn_imports'] ??= new Map();
+    globalThis['cdn_imports'].set(name, resolved);
+    console.info(chalk.italic.dim.green(`automatically resolving "${name}" from cdn...`));
+  }
+
+  return resolved;
+};
