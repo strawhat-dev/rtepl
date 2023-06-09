@@ -6,15 +6,6 @@ import findCacheDir from 'find-cache-dir';
 import prettyREPL from './pretty-repl/index.js';
 import { transpileREPL } from './transform/index.js';
 
-// prettier-ignore
-const displayEnvironmentInfo = () => (
-  console.log(chalk.green(`
-  node ${process.version}
-  ${os.version()} ${os.machine()}
-  ${os.cpus().pop().model}
-  `))
-);
-
 export const defaultREPL = REPL;
 export const initREPL = (init = {}) => {
   const stream = init.output || process.stdout;
@@ -47,6 +38,21 @@ export const initREPL = (init = {}) => {
   };
 
   return instance;
+};
+
+const displayEnvironmentInfo = () => {
+  let osInfo = os.version();
+  if (process.platform === 'darwin') {
+    // os.version() on macOS too verbose
+    osInfo = `${process.platform} v${os.release()}`;
+  }
+
+  // prettier-ignore
+  console.log(chalk.green(`
+  node ${process.version}
+  ${osInfo} ${os.machine()}
+  ${os.cpus().pop().model}
+`));
 };
 
 /** @type {import('yargs-parser').Options}  */
