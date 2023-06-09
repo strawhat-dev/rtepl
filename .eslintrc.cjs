@@ -4,5 +4,6 @@ module.exports = {
   rules: { 'no-empty': 0 },
   extends: ['eslint:recommended'],
   env: { es2022: true, node: true },
+  globals: { clog: 'readonly', rtepl_cdn_imports: 'readonly' },
   parserOptions: { sourceType: 'module', ecmaVersion: 'latest' },
 };

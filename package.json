@@ -25,6 +25,7 @@
     "ansi-regex": "^6.0.1",
     "astring": "^1.8.6",
     "chalk": "^5.2.0",
+    "chalk-template": "^1.1.0",
     "emphasize": "^6.0.0",
     "find-cache-dir": "^4.0.0",
     "highlight.js": "^11.8.0",

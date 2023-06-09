@@ -1,6 +1,11 @@
 import type repl from 'node:repl';
 import type { ColorName, ModifierName } from 'chalk';
 
+declare global {
+  var rtepl_cdn_imports: Map<string, string>;
+  var clog: (template: TemplateStringsArray, ...subs: unknown[]) => void;
+}
+
 type REPL = typeof repl;
 declare const rtepl: REPL;
 declare module 'repl' {
@@ -17,9 +22,9 @@ declare module 'repl' {
      */
     theme?: Theme;
     /**
-     * A configuration object that maps `hljs` classes
-     * to a single or array of `chalk` color/modifier names *(or hex values)*,
-     * for more advanced customization of syntax styling.
+     * A configuration object that maps `hljs` classes to a single
+     * or array of `chalk` color/modifier names *(or hex values)*,
+     * used for more advanced customization of syntax styling.
      * - Can be used in conjunction with the `theme` option, which will be merged.
      */
     sheet?: Partial<SheetConfig>;
@@ -35,9 +40,9 @@ declare module 'repl' {
      */
     commands?: { [command: string]: CommandHandler };
     /**
-     * Extensions that affect transpilation and transpiles commands that would normally be invalid
-     * in a repl context to valid equivalents, allowing for flexibility and quickly testing code.
-     * @defaultValue All options are `true` by default, unless `extensions` is explicitly configured and overridden by the user.
+     * Extensions that affect transpilation process. Commands that would normally be invalid in a
+     * repl context may be transpiled to compatible code, allowing for fast prototyping and testing.
+     * @defaultValue All options are `true` by default, unless `extensions` is explicitly given and overridden by the user.
      */
     extensions?: {
       /**
@@ -53,8 +58,8 @@ declare module 'repl' {
        */
       redeclarations?: boolean;
       /**
-       * Allow for static import syntax,
-       * which will be converted to *dynamic imports* if enabled.
+       * Allow for static import syntax which will
+       * be converted to *dynamic imports* if enabled.
        */
       staticImports?: boolean;
       /**

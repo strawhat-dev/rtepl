@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { Chalk } from 'chalk';
+import { makeTaggedTemplate } from 'chalk-template';
 import { parse } from '@adobe/css-tools';
 import { emphasize } from 'emphasize/lib/core.js';
 import xml from 'highlight.js/lib/languages/xml';
@@ -9,12 +10,14 @@ import { defaultSheet, supportedProps, themes } from './config.js';
 
 /** @param {import('repl').ReplOptions} */
 export const initHighlighter = ({ output, theme, sheet: config }) => {
-  const chalk = new Chalk({ level: output.isTTY ? 3 : 0 });
-  const sheet = initSheet(chalk, { ...defaultSheet, ...parseTheme(theme, config) });
-  emphasize.registerLanguage('typescript', typescript);
+  const chalk = new Chalk(output?.isTTY ? { level: 3 } : {});
+  const template = makeTaggedTemplate(chalk);
+  global['clog'] = (...args) => console.log(template(...args));
   emphasize.registerLanguage('xml', xml); // needed for jsx support
+  emphasize.registerLanguage('typescript', typescript);
+  const sheet = initSheet(chalk, { ...defaultSheet, ...parseTheme(theme, config) });
   const highlighter = (code) => emphasize.highlight('tsx', code, sheet).value;
-  highlighter.underline = output.isTTY && chalk.underline;
+  highlighter.underline = output?.isTTY && chalk.underline;
   return highlighter;
 };
 

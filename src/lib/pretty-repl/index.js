@@ -17,12 +17,11 @@ const BRACKETS = '()[]{}\'"`$';
 // https://github.com/mongodb-js/pretty-repl/blob/master/lib/pretty-repl.js
 class REPLServer extends repl.REPLServer {
   /** @param {import('node:repl').ReplOptions} options */
-  constructor(options = {}) {
+  constructor({ output, ...options } = {}) {
     super(options);
-    options.output ??= process.stdout;
     this.lineBeforeInsert = undefined;
     this.highlightBracketPosition = -1;
-    this.colorize = initHighlighter(options);
+    this.colorize = initHighlighter({ output, ...options });
 
     // For some reason, tests fail if we don't initialize line to be the empty string.
     // Specifically, `REPLServer.Interface.getCursorPos()` finds itself in a state where `line` is undefined.
@@ -152,7 +151,7 @@ class REPLServer extends repl.REPLServer {
 
       // Then remove the BOM characters again and colorize the bracket in between.
       stringToWrite = stringToWrite.replace(/\ufeff(.+)\ufeff/, (_, bracket) =>
-        this.colorize.underline(bracket)
+        this.colorize?.underline?.(bracket)
       );
     } else stringToWrite = this._doColorize(stringToWrite);
 
