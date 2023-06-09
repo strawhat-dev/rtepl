@@ -13,9 +13,9 @@ const tsconfig = {
   minify: false,
   loader: 'tsx',
   format: 'esm',
-  platform: 'neutral',
-  target: 'node16',
   jsx: 'automatic',
+  target: 'node16',
+  platform: 'neutral',
   define: { require: 'global.require' },
   tsconfigRaw: { compilerOptions: { preserveValueImports: true } },
 };
@@ -42,7 +42,7 @@ export const shouldSkipParsing = (code, opts) => (
  */
 export const getImportDeclaration = (name, props, cdn = true) => {
   if (globalThis['cdn_imports']?.has(name)) {
-    return resolvedImportDeclaration(globalThis['cdn_imports']?.get(name), props);
+    return resolvedImportDeclaration(globalThis['cdn_imports'].get(name), props);
   }
 
   const resolved = resolveModule(name, cdn);
