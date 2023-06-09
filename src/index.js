@@ -1,11 +1,11 @@
 import { defaultREPL, initREPL } from './lib/index.js';
 
 /** @param {import('repl').ReplOptions} options */
-export const start = (options = {}) => initREPL(options).start(options);
+export const start = (options) => initREPL(options).start(options);
 
 export class REPLServer extends defaultREPL.REPLServer {
   /** @param {import('repl').ReplOptions} options */
-  constructor(options = {}) {
+  constructor(options) {
     return new (initREPL(options).REPLServer)(options);
   }
 }

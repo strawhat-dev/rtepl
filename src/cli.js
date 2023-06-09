@@ -2,4 +2,11 @@
 
 import { start } from './index.js';
 
-start();
+start({
+  useGlobal: true,
+  closeOnSigint: true,
+  breakEvalOnSigint: true,
+  commands: {
+    clear: ({ repl }) => repl.write(null, { ctrl: true, name: 'l' }),
+  },
+});
