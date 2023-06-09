@@ -1,4 +1,21 @@
 /**
+ * subtree for `({ prop: alias })`
+ * @param {string} prop
+ * @param {string} alias
+ * @returns {Property}
+ */
+export const initProp = (prop, alias) => ({
+  type: 'Property',
+  kind: 'init',
+  method: false,
+  computed: false,
+  shorthand: prop === alias,
+  key: { type: 'Identifier', name: prop },
+  value: { type: 'Identifier', name: alias },
+});
+
+/**
+ * subtree for declaration with resolved assignment from `global` namespace
  * @param {string} globalName
  * @param {{ properties?: Property[], name?: Identifier }}
  * @returns {VariableDeclaration}
@@ -12,7 +29,7 @@ export const resolvedImportDeclaration = (globalName, { name, properties } = {})
       type: 'VariableDeclarator',
       init: {
         type: 'MemberExpression',
-        object: { type: 'Identifier', name: 'globalThis' },
+        object: { type: 'Identifier', name: 'global' },
         property: { type: 'Literal', value: globalName },
         computed: true,
       },
@@ -76,28 +93,12 @@ export const dynamicImportDeclaration = (moduleName, { name, properties } = {}) 
   };
 };
 
-/**
- * subtree for `({ prop: alias })`
- * @param {string} prop
- * @param {string} alias
- * @returns {Property}
- */
-export const initProp = (prop, alias) => ({
-  type: 'Property',
-  kind: 'init',
-  method: false,
-  computed: false,
-  shorthand: prop === alias,
-  key: { type: 'Identifier', name: prop },
-  value: { type: 'Identifier', name: alias },
-});
-
 /** @param {string} value */
 const globalAssignExpression = (globalName) => ({
   type: 'AssignmentExpression',
   left: {
     type: 'MemberExpression',
-    object: { type: 'Identifier', name: 'globalThis' },
+    object: { type: 'Identifier', name: 'global' },
     property: { type: 'Literal', value: globalName },
     computed: true,
   },

@@ -1,4 +1,3 @@
-import chalk from 'chalk';
 import { createRequire, isBuiltin } from 'node:module';
 import { transform } from '@esbuild-kit/core-utils';
 import {
@@ -32,20 +31,22 @@ export const esbuild = async (code, file) => {
  */
 // prettier-ignore
 export const shouldSkipParsing = (code, opts) => (
-  !Object.values(opts).some((enabled) => enabled) || // naive check
-  !['let', 'const', 'import', 'require'].some((keyword) => code.includes(keyword))
+  !/\b(let|const|import|require)\b/.test(code) || // naive check
+  !Object.values(opts).some((enabled) => enabled)
 );
 
 /**
- * @param {string} name
+ * @param {string} moduleName
  * @param {object} props
  */
-export const getImportDeclaration = (name, props, cdn = true) => {
-  if (globalThis['cdn_imports']?.has(name)) {
-    return resolvedImportDeclaration(globalThis['cdn_imports'].get(name), props);
+export const getImportDeclaration = (moduleName, props, cdn = true) => {
+  let resolved = global.rtepl_cdn_imports?.get(moduleName);
+  if (resolved) {
+    if (global[resolved]) return resolvedImportDeclaration(resolved, props);
+    else global.rtepl_cdn_imports.delete(moduleName);
   }
 
-  const resolved = resolveModule(name, cdn);
+  resolved = resolveModule(moduleName, cdn);
   return dynamicImportDeclaration(resolved, props);
 };
 
@@ -85,21 +86,29 @@ export const staticImportReducer = (acc, { type, local, imported }) => ({
 }[type]?.());
 
 /**
- * @param {string} name
+ * @param {string} moduleName
  * @param {boolean} cdn
  */
-const resolveModule = (name, cdn) => {
-  if (!cdn || isBuiltin(name) || name.startsWith('.') || name.startsWith('https:')) return name;
-  let resolved = `https://cdn.jsdelivr.net/npm/${name}/+esm`;
+const resolveModule = (moduleName, cdn) => {
+  if (
+    !cdn || // option disabled by user
+    isBuiltin(moduleName) || // node.js builtins
+    moduleName.startsWith('.') || // relative imports
+    moduleName.startsWith('https:') // network imports
+  ) {
+    return moduleName;
+  }
+
+  let resolved = `https://cdn.jsdelivr.net/npm/${moduleName}/+esm`;
   try {
     const require = createRequire(`${process.cwd()}/index.js`);
-    if (require.resolve(name)) resolved = name;
+    if (require.resolve(moduleName)) resolved = moduleName;
   } catch (_) {}
 
-  if (resolved !== name) {
-    globalThis['cdn_imports'] ??= new Map();
-    globalThis['cdn_imports'].set(name, resolved);
-    console.info(chalk.italic.dim.green(`automatically resolving "${name}" from cdn...`));
+  if (resolved !== moduleName) {
+    global['rtepl_cdn_imports'] ??= new Map();
+    global.rtepl_cdn_imports.set(moduleName, resolved);
+    clog`{dim.italic.green automatically resolving "${moduleName}" using network import...}`;
   }
 
   return resolved;

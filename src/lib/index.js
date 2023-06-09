@@ -4,25 +4,33 @@ import chalk from 'chalk';
 import parse from 'yargs-parser';
 import findCacheDir from 'find-cache-dir';
 import prettyREPL from './pretty-repl/index.js';
-import { transpile } from './transform/index.js';
+import { transpileREPL } from './transform/index.js';
+
+// prettier-ignore
+const displayEnvironmentInfo = () => (
+  console.log(chalk.green(`
+  node ${process.version}
+  ${os.version()} ${os.machine()}
+  ${os.cpus().pop().model}
+  `))
+);
 
 export const defaultREPL = REPL;
-
-/** @param {REPL.ReplOptions} options */
-export const initREPL = (options = {}) => {
-  const stream = options.output || process.stdout;
-  const instance = options.terminal ?? stream.isTTY ? prettyREPL : REPL;
+export const initREPL = (init = {}) => {
+  const stream = init.output || process.stdout;
+  const instance = init.terminal ?? stream.isTTY ? prettyREPL : REPL;
   const { start } = instance;
-  /** @param {REPL.ReplOptions} init */
-  instance.start = (init = options) => {
-    displayEnvironmentInfo();
-    const { commands, closeOnSigint, extensions, ...serverConfig } = { ...defaultConfig, ...init };
-    serverConfig.prompt ??= chalk.green('> ');
-    const repl = start(serverConfig);
+  /** @param {REPL.ReplOptions} options */
+  instance.start = (options = {}) => {
+    const config = { ...defaultConfig, ...init, ...options };
+    const { commands, extensions, closeOnSigint, ...server } = config;
+    server.output ??= stream;
+    server.output.isTTY && (server.prompt ??= chalk.green('> '));
+    const repl = (displayEnvironmentInfo(), start(server));
     const cache = findCacheDir({ name: 'rtepl', create: true });
     if (closeOnSigint) repl.on('SIGINT', repl.close);
     if (cache) {
-      repl.setupHistory(`${cache}/.node_repl_history`, (err) => err && console.error(err));
+      repl.setupHistory(`${cache}/.node_repl_history`, (err) => err && clog`{red ${err}}`);
     }
 
     const { eval: $ } = { ...repl };
@@ -32,21 +40,13 @@ export const initREPL = (options = {}) => {
       const args = command.replace(commandName, '').trim();
       const handleCommand = commands[commandName];
       if (handleCommand) return handleCommand({ repl, argv, args, command });
-      return $(...(await transpile([command, ...rest], extensions)));
+      return $(...(await transpileREPL([command, ...rest], extensions)));
     };
 
     return repl;
   };
 
   return instance;
-};
-
-const displayEnvironmentInfo = () => {
-  const [{ model }] = os.cpus();
-  const nodeInfo = `node ${process.version}`;
-  const osInfo = `${os.version()} ${os.machine()}`;
-  const info = [nodeInfo, osInfo, model];
-  console.log(chalk.green(info.join('\n')));
 };
 
 /** @type {import('yargs-parser').Options}  */
