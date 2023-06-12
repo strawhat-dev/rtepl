@@ -2,19 +2,17 @@ import type repl from 'node:repl';
 import type { ColorName, ModifierName } from 'chalk';
 
 declare global {
-  var rtepl_cdn_imports: Map<string, string>;
-  var clog: (template: TemplateStringsArray, ...subs: unknown[]) => void;
+  /** currently active repl instance. */
+  var $repl: repl.REPLServer;
+
+  /** utility logger as tagged template function w/ `chalk` support. */
+  var $log: (template: TemplateStringsArray, ...subs: unknown[]) => void;
 }
 
 type REPL = typeof repl;
 declare const rtepl: REPL;
 declare module 'repl' {
   interface ReplOptions extends repl.ReplOptions {
-    /**
-     * **Close** the repl on `SIGINT` (`Ctrl` + `c`).
-     * @defaultValue `true`
-     */
-    closeOnSigint?: boolean;
     /**
      * The name of the theme to use (provided by `hljs` stylesheets).
      * @see {@link https://github.com/highlightjs/highlight.js/tree/main/src/styles}
@@ -29,7 +27,7 @@ declare module 'repl' {
      */
     sheet?: Partial<SheetConfig>;
     /**
-     * Define commands to be handled with a custom callback instead of the repl server when a matching command occurs.
+     * Define commands to be handled with a custom callback instead of the repl server when a matching command name is given.
      * - Note: Differs from commands defined by the native `repl.defineCommand`, in that the `'.'` prefix is not needed.
      * @example
      * repl.start({
@@ -38,28 +36,28 @@ declare module 'repl' {
      *   }
      * })
      */
-    commands?: { [command: string]: CommandHandler };
+    commands?: { [command: string]: (cmd: CommandEvent) => void };
     /**
-     * Extensions that affect transpilation process. Commands that would normally be invalid in a
-     * repl context may be transpiled to compatible code, allowing for fast prototyping and testing.
-     * @defaultValue All options are `true` by default, unless `extensions` is explicitly given and overridden by the user.
+     * Extensions that affect transpilation process. Commands that would normally be invalid in the repl context
+     * may be transpiled to compatible code, allowing for quick prototyping and flexibility while testing snippets.
+     * @defaultValue All options are `true` by default, *unless `extensions` is explicitly given and overridden by the user*.
      */
     extensions?: {
       /**
        * Automatically use a cdn (jsdelivr) for all imports when
-       * the imported module is not a node builtin, or the module
+       * the imported module is not a node built-in, or the module
        * cannot be resolved from the current working directory.
-       * - Note: `--experimental-network-imports` flag must be **enabled**
+       * - Note: `--experimental-network-imports` flag must be enabled
        */
       cdn?: boolean;
       /**
-       * Similarily to the DevTools console, allow redeclaring `let` & `const`.\
+       * Allow redeclaring `let` & `const`, similarily to the DevTools console. \
        * *(Converts all unscoped declarations to `var`)*
        */
       redeclarations?: boolean;
       /**
-       * Allow for static import syntax which will
-       * be converted to *dynamic imports* if enabled.
+       * Allow for static import syntax
+       * *(which will be transpiled to dynamic imports if enabled)*.
        */
       staticImports?: boolean;
       /**
@@ -79,19 +77,8 @@ export declare const REPLServer: REPL['REPLServer'];
 export declare const REPL_MODE_SLOPPY: REPL['REPL_MODE_SLOPPY'];
 export declare const REPL_MODE_STRICT: REPL['REPL_MODE_STRICT'];
 
+// exported type definitions
 export type * from 'node:repl';
-export type CommandHandler = (cmd: CommandEvent) => void;
-export type CommandEvent = {
-  /** The current `repl` server instance. */
-  repl: REPL['REPLServer'];
-  /** An array of parsed arguments passed to the command. */
-  argv: string[];
-  /** The unparsed args string containing everything after the command itself. */
-  args: string;
-  /** The full command string. */
-  command: string;
-};
-
 export type Style = ColorName | ModifierName | `#${string}`;
 export type SheetConfig = {
   [className: string]: Style | Style[];
@@ -357,7 +344,8 @@ export type SheetConfig = {
   deletion: Style | Style[];
 };
 
-export type Theme =
+// https://github.com/highlightjs/highlight.js/tree/main/src/styles
+type Theme =
   | 'a11y-dark'
   | 'a11y-light'
   | 'agate'
@@ -606,3 +594,16 @@ export type Theme =
   | 'base16/woodland'
   | 'base16/xcode-dusk'
   | 'base16/zenburn';
+
+type CommandEvent = {
+  /** The current repl instance. */
+  repl: repl.REPLServer;
+  /** The full command string. */
+  command: string;
+  /** The args string (contains everything after the command name itself). */
+  args: string;
+  /** An array of parsed arguments passed to the command. */
+  argv: string[];
+  /** @internal The rest of the arguments that were passed to `repl.eval` before the command was intercepted. */
+  _: Parameters<repl.REPLEval> extends [_, ...infer rest] ? rest : never;
+};

@@ -7,18 +7,17 @@ import { emphasize } from 'emphasize/lib/core.js';
 import xml from 'highlight.js/lib/languages/xml';
 import typescript from 'highlight.js/lib/languages/typescript';
 import { defaultSheet, supportedProps, themes } from './config.js';
+import { extend } from '../util.js';
 
 /** @param {import('repl').ReplOptions} */
 export const initHighlighter = ({ output, theme, sheet: config }) => {
   const chalk = new Chalk(output?.isTTY ? { level: 3 } : {});
-  const template = makeTaggedTemplate(chalk);
-  global['clog'] = (...args) => console.log(template(...args));
-  emphasize.registerLanguage('xml', xml); // needed for jsx support
+  const chalkTemplate = makeTaggedTemplate(chalk);
   emphasize.registerLanguage('typescript', typescript);
+  emphasize.registerLanguage('xml', xml); // needed for jsx support
   const sheet = initSheet(chalk, { ...defaultSheet, ...parseTheme(theme, config) });
-  const highlighter = (code) => emphasize.highlight('tsx', code, sheet).value;
-  highlighter.underline = output?.isTTY && chalk.underline;
-  return highlighter;
+  extend(global, { $log: (...args) => console.log(chalkTemplate(...args)) });
+  return extend((code) => emphasize.highlight('tsx', code, sheet).value, { chalk });
 };
 
 /**
@@ -26,23 +25,22 @@ export const initHighlighter = ({ output, theme, sheet: config }) => {
  * @param {import('repl').ReplOptions['sheet']}
  * @returns {import('emphasize').Sheet}
  */
-//prettier-ignore
-const initSheet = (chalk, { default: fallback, ...rest }) => (
-  (chalk = fallback?.startsWith?.('#') ? chalk.hex(fallback) : chalk[fallback] || chalk),
-  Object.entries(rest).reduce((sheet, [prop, values]) => {
-    Array.isArray(values) || (values = [values]);
-    sheet[prop] = values.reduce((instance, style) =>
-      style.startsWith('#') ? instance.hex(style) : instance[style] || instance,
-      chalk
+const initSheet = (chalk, { default: [fallback] = [], ...rest }) => {
+  const instance = fallback?.startsWith('#') ? chalk.hex(fallback) : chalk;
+  return Object.entries(rest).reduce((sheet, [prop, values]) => {
+    sheet[prop] = (Array.isArray(values) ? values : [values]).reduce(
+      (acc, style) => (style.startsWith?.('#') ? acc.hex(style) : acc[style] || acc),
+      instance
     );
 
     return sheet;
-  }, {})
-);
+  }, {});
+};
 
 /**
  * @param {import('repl').ReplOptions['theme']} theme
  * @param {import('repl').ReplOptions['sheet']} config
+ * @returns {import('repl').ReplOptions['sheet']}
  */
 const parseTheme = (theme, config = {}) => {
   if (!themes.has(theme)) return config;
@@ -51,18 +49,19 @@ const parseTheme = (theme, config = {}) => {
   const { rules } = parse(css)?.stylesheet ?? {};
   return rules?.reduce((acc, { selectors, declarations }) => {
     if (!selectors || !declarations) return acc;
-    const values = declarations
-      .filter(({ property }) => supportedProps.includes(property))
-      .map(({ property, value }) => (property === 'font-weight' && +value > 400 ? 'bold' : value));
-
-    // prettier-ignore
-    values.length && selectors.forEach((hljsSelector) => {
-      const selector = hljsSelector.replace(/[.]hljs-?/g, '') || 'default';
-      if (!Array.isArray(acc[selector])) {
-        acc[selector] = typeof acc[selector] === 'string' ? [acc[selector]] : [];
+    const values = declarations.reduce((cur, { property, value }) => {
+      if (supportedProps.includes(property)) {
+        property === 'font-weight' && +value > 400 && (value = 'bold');
+        cur.push(value);
       }
 
-      acc[selector].push(...values);
+      return cur;
+    }, []);
+
+    (values.length ? selectors : []).forEach((selector) => {
+      const cur = selector.replace(/[.]hljs-?/g, '') || 'default';
+      Array.isArray(acc[cur]) || (acc[cur] = typeof acc[cur] === 'string' ? [acc[cur]] : []);
+      acc[cur].push(...values);
     });
 
     return acc;
