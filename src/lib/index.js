@@ -3,6 +3,8 @@ import findCacheDir from 'find-cache-dir';
 import { transpileREPL } from './transform/index.js';
 import { displayEnvironmentInfo, extend } from './util.js';
 import prettyREPL, { defaultREPL } from './pretty-repl/index.js';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
 /** @type {import('repl').ReplOptions} */
 const defaultConfig = {
@@ -37,8 +39,12 @@ export const initREPL = (init = {}) => {
     const { commands, extensions, ...server } = config;
     const repl = (displayEnvironmentInfo(), start(server));
     repl.setupHistory(
-      `${findCacheDir({ name: 'rtepl', create: true })}/.node_repl_history`,
-      () => {}
+      `${findCacheDir({
+        name: 'rtepl',
+        create: true,
+        cwd: dirname(fileURLToPath(import.meta.url)),
+      })}/.node_repl_history`,
+      () => 0
     );
 
     extend(global, { $repl: repl });
