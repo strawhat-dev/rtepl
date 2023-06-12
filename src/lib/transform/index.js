@@ -1,6 +1,7 @@
 import { parse } from 'meriyah';
 import { generate } from 'astring';
-import { esbuild, getImportDeclaration, shouldSkipParsing, staticImportReducer } from './util.js';
+import { esbuild, shouldSkipParsing } from './util.js';
+import { getImportDeclaration, initProp } from './abstract-syntax-tree.js';
 
 /** @type {import('meriyah').Options} */
 const parserOptions = {
@@ -20,11 +21,10 @@ export const transpileREPL = async (args, extensions) => {
   if (shouldSkipParsing(args[0], opts)) return args;
   try {
     const ast = parse(args[0], parserOptions);
-    const body = ast.body;
-    for (let i = 0; i < body.length; ++i) {
-      const statement = body[i];
+    for (let i = 0; i < ast.body?.length; ++i) {
+      const statement = ast.body[i];
       const transformStatement = statementDispatch[statement?.type];
-      transformStatement && (body[i] = transformStatement(statement, opts));
+      transformStatement && (ast.body[i] = transformStatement(statement, opts));
     }
 
     args[0] = generate(ast);
@@ -33,45 +33,60 @@ export const transpileREPL = async (args, extensions) => {
   return args;
 };
 
-/**
- * @typedef {import('meriyah').ESTree.Statement} Statement
- * @typedef {import('meriyah').ESTree.ImportDeclaration} ImportDeclaration
- * @typedef {import('meriyah').ESTree.VariableDeclaration} VariableDeclaration
- * @typedef {import('repl').ReplOptions['extensions']} Opts
- * @type {{
- *   ImportDeclaration(statement: ImportDeclaration, opts: Opts): Statement
- *   VariableDeclaration(statement: VariableDeclaration, opts: Opts): Statement
- * }}
- */
-const statementDispatch = {
-  ImportDeclaration(statement, { cdn, staticImports }) {
-    if (!staticImports) return statement;
-    const { source, specifiers } = statement;
-    const subtreeProps = specifiers?.reduce(staticImportReducer, {});
-    return getImportDeclaration(source?.value, subtreeProps, cdn);
-  },
-  VariableDeclaration(statement, { cdn, redeclarations }) {
-    const [declaration] = statement['declarations'] || [];
-    if (redeclarations) statement['kind'] = 'var';
-    if (!cdn || !declaration) return statement;
-    const { id, init } = declaration;
+const statementDispatch = /** @type {const} */ ({
+  /** @param {import('meriyah').ESTree.VariableDeclaration} declaration */
+  VariableDeclaration(declaration, { cdn, redeclarations }) {
+    if (redeclarations) declaration.kind = 'var';
+    if (!cdn || !declaration.declarations?.length) return declaration;
+    const [{ id, init }] = declaration.declarations;
+    const { type, source } = { ...init?.argument, ...init?.argument?.callee?.object };
+    // dynamic import -> resolved dynamic import
+    if (type === 'ImportExpression') {
+      const { value: name } = source;
+      return getImportDeclaration({ name, id });
+    }
+
     const { name, expressions } = init?.callee ?? {};
-    let { object, property } = expressions?.[1] ?? {};
+    const { object, property } = expressions?.[1] ?? {};
     const transpiledName = `${object?.name}.${property?.name}`;
+    // common.js require -> resolved dynamic import
     if (name === 'require' || transpiledName === 'global.require') {
-      // common.js require -> resolved dynamic import
-      const [{ value }] = init.arguments;
-      return getImportDeclaration(value, id);
+      const [{ value: name }] = init.arguments;
+      return getImportDeclaration({ name, id });
     }
 
-    const { argument } = init ?? {};
-    ({ object } = argument?.callee ?? {});
-    if ([argument?.type, object?.type].some((t) => t === 'ImportExpression')) {
-      // dynamic import -> resolved dynamic import
-      const { value } = { ...argument?.source, ...object?.source };
-      return getImportDeclaration(value, id);
-    }
-
-    return statement;
+    return declaration;
   },
-};
+  // prettier-ignore
+  /** @param {import('meriyah').ESTree.ImportDeclaration} declaration */
+  ImportDeclaration(declaration, { cdn, staticImports }) {
+    if (!staticImports) return declaration;
+    const { specifiers, source: { value: name } } = declaration;
+    const id = specifiers.reduce((acc, { type, local, imported }) => {
+        if (type === 'ImportDefaultSpecifier') acc.name = local.name;
+        else if (type === 'ImportSpecifier') {
+          acc.type = 'ObjectPattern';
+          acc.properties ??= [];
+          acc.properties.push(initProp(imported.name, local.name));
+        } else if (type === 'ImportNamespaceSpecifier') {
+          if (acc.name) {
+            // move global assignment of already used default import
+            // to destructured property import, i.e. `({ default: name } = ...)`
+            acc.type = 'ObjectPattern';
+            acc.properties ??= [];
+            acc.properties.push(initProp('default', acc.name));
+          }
+
+          // replace the name and value to be assigned
+          // from the default import to the namespace import
+          acc.name = local.name;
+        }
+
+        return acc;
+      },
+      { type: 'Identifier' }
+    );
+
+    return getImportDeclaration({ name, id, cdn });
+  },
+});

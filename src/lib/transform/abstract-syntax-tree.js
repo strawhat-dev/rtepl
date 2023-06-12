@@ -1,8 +1,10 @@
+import { isUnresolvableImport } from './util.js';
+
 /**
- * subtree for `({ prop: alias })`
+ * subtree for `({ prop: alias })`.
  * @param {string} prop
  * @param {string} alias
- * @returns {Property}
+ * @returns {import('meriyah').ESTree.Property}
  */
 export const initProp = (prop, alias) => ({
   type: 'Property',
@@ -15,54 +17,72 @@ export const initProp = (prop, alias) => ({
 });
 
 /**
- * subtree for declaration with resolved assignment from `global` namespace
- * @param {string} globalName
- * @param {{ properties?: Property[], name?: Identifier }}
- * @returns {VariableDeclaration}
+ * subtree for assigning resolved imports in the `repl` context
+ * @param {{
+ *   name: string;
+ *   id: import('meriyah').ESTree.Identifier;
+ *   cdn?: boolean;
+ * }}
+ *
+ * @returns {import('meriyah').ESTree.VariableDeclaration}
  */
-export const resolvedImportDeclaration = (globalName, { name, properties } = {}) => ({
-  type: 'VariableDeclaration',
-  kind: 'var',
-  declarations: [
-    {
-      id: properties ? { type: 'ObjectPattern', properties } : { type: 'Identifier', name },
-      type: 'VariableDeclarator',
-      init: {
-        type: 'MemberExpression',
-        object: { type: 'Identifier', name: 'global' },
-        property: { type: 'Literal', value: globalName },
-        computed: true,
-      },
+export const getImportDeclaration = ({ name, id, cdn = true }) => {
+  let assignedName;
+  let resolved = name;
+  let body = {
+    type: 'LogicalExpression',
+    left: {
+      type: 'ChainExpression',
+      expression: getPropertyExpression({ name: 'res', prop: 'default' }),
     },
-  ],
-});
+    operator: '||',
+    right: { type: 'Identifier', name: 'res' },
+  };
 
-/**
- * custom dynamic import subtree
- * @param {string} moduleName
- * @param {{ properties?: Property[], name?: Identifier }}
- * @returns {VariableDeclaration}
- */
-export const dynamicImportDeclaration = (moduleName, { name, properties } = {}) => {
-  const body = [];
-  const returnStatement = { type: 'ReturnStatement', argument: globalAssignExpression(moduleName) };
-  const id = properties ? { type: 'ObjectPattern', properties } : { type: 'Identifier', name };
-  if (id.type === 'ObjectPattern') {
-    const hasExplicitDefaultProp = properties.some(({ key }) => key?.name === 'default');
-    if (name || hasExplicitDefaultProp) {
-      body.push({ type: 'ExpressionStatement', expression: globalAssignExpression(moduleName) });
-      let assignment = { ...returnStatement.argument, right: resolvedChainExpression.right };
-      if (name) returnStatement.argument.left.property.value = name;
-      else assignment = resolvedChainExpression.right;
-      hasExplicitDefaultProp && (returnStatement.argument = assignment);
-    }
+  if (id.name && id.properties) {
+    // allow both destructured properties and default/namespaced imports to be assigned at once,
+    // by returning the assignment to the global namespace, making the import readily available
+    ({ name: assignedName, ...id } = id);
+    body = {
+      type: 'AssignmentExpression',
+      left: getPropertyExpression({ prop: assignedName }),
+      operator: '=',
+      right: body,
+    };
   }
 
-  body.push(returnStatement);
+  // prettier-ignore
+  if (isUnresolvableImport(name, cdn)) {
+    resolved = `https://cdn.jsdelivr.net/npm/${name}/+esm`;
+    const init = getPropertyExpression({ prop: resolved });
+    if (global[resolved]) { // already imported previously and available
+      const declarator = { type: 'VariableDeclarator', id, init };
+      assignedName && (declarator.init = {
+        type: 'AssignmentExpression',
+        left: { type: 'Identifier', name: assignedName },
+        operator: '=',
+        right: init,
+      });
+
+      // skip building dynamic import subtree and assign directly from global cache instead.
+      return { type: 'VariableDeclaration', kind: 'var', declarations: [declarator] };
+    }
+
+    let argument = init;
+    if (assignedName) { // handle default import usage with named/namespace import.
+      const hasExplicitDefaultProp = id.properties.some(({ key }) => key?.name === 'default');
+      const left = getPropertyExpression({ type: 'Literal', prop: assignedName });
+      const right = hasExplicitDefaultProp ? { type: 'Identifier', name: 'res' } : argument;
+      argument = { type: 'AssignmentExpression', left, operator: '=', right };
+    }
+
+    body = { type: 'BlockStatement', body: dynamicImportAssignmentBlock({ argument, left: init }) };
+    $log`{dim.italic.green automatically attempting to resolve "${name}" from network-import...}`;
+  }
 
   return {
-    type: 'VariableDeclaration',
     kind: 'var',
+    type: 'VariableDeclaration',
     declarations: [
       {
         id,
@@ -73,17 +93,14 @@ export const dynamicImportDeclaration = (moduleName, { name, properties } = {}) 
             type: 'CallExpression',
             callee: {
               type: 'MemberExpression',
-              object: { type: 'ImportExpression', source: { type: 'Literal', value: moduleName } },
+              object: dynamicImportExpression(resolved),
               property: { type: 'Identifier', name: 'then' },
-              computed: false,
             },
             arguments: [
               {
                 type: 'ArrowFunctionExpression',
                 params: [{ type: 'Identifier', name: 'res' }],
-                body: { type: 'BlockStatement', body },
-                expression: true,
-                async: false,
+                body,
               },
             ],
           },
@@ -93,41 +110,75 @@ export const dynamicImportDeclaration = (moduleName, { name, properties } = {}) 
   };
 };
 
-/** @param {string} value */
-const globalAssignExpression = (globalName) => ({
-  type: 'AssignmentExpression',
-  left: {
-    type: 'MemberExpression',
-    object: { type: 'Identifier', name: 'global' },
-    property: { type: 'Literal', value: globalName },
-    computed: true,
-  },
-  operator: '=',
-  right: resolvedChainExpression,
+/**
+ * subtree for `import('name')`
+ * @param {string} name
+ * @returns {import('meriyah').ESTree.ImportExpression}
+ */
+const dynamicImportExpression = (name) => ({
+  type: 'ImportExpression',
+  source: { type: 'Literal', value: name },
 });
 
-/** subtree for `res?.default || res` */
-const resolvedChainExpression = Object.freeze(
-  /** @type {const} */ ({
-    type: 'LogicalExpression',
-    left: {
-      type: 'ChainExpression',
-      expression: {
-        type: 'MemberExpression',
-        object: { type: 'Identifier', name: 'res' },
-        property: { type: 'Identifier', name: 'default' },
-        optional: true,
-        computed: false,
+/**
+ * subtree for property access expression.
+ * @returns {import('meriyah').ESTree.MemberExpression}
+ */
+const getPropertyExpression = ({
+  prop,
+  type = /^\w+$/.test(prop) ? 'Identifier' : 'Literal',
+  computed = type === 'Literal',
+  optional = type === 'Identifier',
+  name = 'global',
+} = {}) => ({
+  type: 'MemberExpression',
+  object: { type: 'Identifier', name },
+  property: { type, [{ Identifier: 'name', Literal: 'value' }[type]]: prop },
+  computed,
+  optional,
+});
+
+/**
+ * subtree for conditional assignment in dynamic import body.
+ * @param {{ left: import('meriyah').ESTree.MemberExpressionargument: import('meriyah').ESTree.Expression }}
+ * @returns {import('meriyah').ESTree.Statement[]}
+ */
+const dynamicImportAssignmentBlock = ({ left, argument }) => [
+  {
+    type: 'ExpressionStatement',
+    expression: {
+      type: 'AssignmentExpression',
+      left,
+      operator: '=',
+      right: {
+        type: 'LogicalExpression',
+        left: {
+          type: 'ChainExpression',
+          expression: getPropertyExpression({ name: 'res', prop: 'default' }),
+        },
+        operator: '||',
+        right: { type: 'Identifier', name: 'res' },
       },
     },
-    operator: '||',
-    right: { type: 'Identifier', name: 'res' },
-  })
-);
-
-// type defs
-/**
- * @typedef {import('meriyah').ESTree.Property} Property
- * @typedef {import('meriyah').ESTree.Identifier} Identifier
- * @typedef {import('meriyah').ESTree.VariableDeclaration} VariableDeclaration
- */
+  },
+  {
+    type: 'ExpressionStatement',
+    expression: {
+      type: 'AssignmentExpression',
+      left: {
+        type: 'MemberExpression',
+        object: {
+          type: 'LogicalExpression',
+          left,
+          operator: '??',
+          right: { type: 'ObjectExpression', properties: [] },
+        },
+        property: { type: 'Identifier', name: 'default' },
+        computed: false,
+      },
+      operator: '??=',
+      right: left,
+    },
+  },
+  { type: 'ReturnStatement', argument },
+];
