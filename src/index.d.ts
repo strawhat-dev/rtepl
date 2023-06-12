@@ -25,7 +25,7 @@ declare module 'repl' {
      * used for more advanced customization of syntax styling.
      * - Can be used in conjunction with the `theme` option, which will be merged.
      */
-    sheet?: Partial<SheetConfig>;
+    sheet?: SheetConfig;
     /**
      * Define commands to be handled with a custom callback instead of the repl server when a matching command name is given.
      * - Note: Differs from commands defined by the native `repl.defineCommand`, in that the `'.'` prefix is not needed.
@@ -81,267 +81,267 @@ export declare const REPL_MODE_STRICT: REPL['REPL_MODE_STRICT'];
 export type * from 'node:repl';
 export type Style = ColorName | ModifierName | `#${string}`;
 export type SheetConfig = {
-  [className: string]: Style | Style[];
+  [className?: string]: Style | Style[];
 
   /**
    * fallback value
    */
-  default: Style | Style[];
+  default?: Style | Style[];
 
   /**
    * keyword in a regular Algol-style language
    */
-  keyword: Style | Style[];
+  keyword?: Style | Style[];
 
   /**
    * built-in or library object (constant, class, function)
    */
-  built_in: Style | Style[];
+  built_in?: Style | Style[];
 
   /**
    * data type (in a language with syntactically significant types) (`string`, `int`, `array`, etc.)
    */
-  type: Style | Style[];
+  type?: Style | Style[];
 
   /**
    * special identifier for a built-in value (`true`, `false`, `null`, etc.)
    */
-  literal: Style | Style[];
+  literal?: Style | Style[];
 
   /**
    * number, including units and modifiers, if any.
    */
-  number: Style | Style[];
+  number?: Style | Style[];
 
   /**
    * operators: `+`, `-`, `>>`, `|`, `==`
    */
-  operator: Style | Style[];
+  operator?: Style | Style[];
 
   /**
    * aux. punctuation that should be subtly highlighted (parentheses, brackets, etc.)
    */
-  punctuation: Style | Style[];
+  punctuation?: Style | Style[];
 
   /**
    * object property `obj.prop1.prop2.value`
    */
-  property: Style | Style[];
+  property?: Style | Style[];
 
   /**
    * literal regular expression
    */
-  regexp: Style | Style[];
+  regexp?: Style | Style[];
 
   /**
    * literal string, character
    */
-  string: Style | Style[];
+  string?: Style | Style[];
 
   /**
    * an escape character such as `\n`
    */
-  'char.escape': Style | Style[];
+  'char.escape'?: Style | Style[];
 
   /**
    * parsed section inside a literal string
    */
-  subst: Style | Style[];
+  subst?: Style | Style[];
 
   /**
    * symbolic constant, interned string, goto label
    */
-  symbol: Style | Style[];
+  symbol?: Style | Style[];
 
   /**
    * **deprecated** You probably want `title.class`
    */
-  class: Style | Style[];
+  class?: Style | Style[];
 
   /**
    * **deprecated** You probably want `title.function`
    */
-  function: Style | Style[];
+  function?: Style | Style[];
 
   /**
    * variables
    */
-  variable: Style | Style[];
+  variable?: Style | Style[];
 
   /**
    * variable with special meaning in a language, e.g.: `this`, `window`, `super`, `self`, etc.
    */
-  'variable.language': Style | Style[];
+  'variable.language'?: Style | Style[];
 
   /**
    * variable that is a constant value, ie `MAX_FILES`
    */
-  'variable.constant': Style | Style[];
+  'variable.constant'?: Style | Style[];
 
   /**
    * name of a class or a function
    */
-  title: Style | Style[];
+  title?: Style | Style[];
 
   /**
    * name of a class (interface, trait, module, etc)
    */
-  'title.class': Style | Style[];
+  'title.class'?: Style | Style[];
 
   /**
    * name of class being inherited from, extended, etc.
    */
-  'title.class.inherited': Style | Style[];
+  'title.class.inherited'?: Style | Style[];
 
   /**
    * name of a function
    */
-  'title.function': Style | Style[];
+  'title.function'?: Style | Style[];
 
   /**
    * name of a function (when being invoked)
    */
-  'title.function.invoke': Style | Style[];
+  'title.function.invoke'?: Style | Style[];
 
   /**
    * block of function arguments (parameters) at the place of declaration
    */
-  params: Style | Style[];
+  params?: Style | Style[];
 
   /**
    * comments
    */
-  comment: Style | Style[];
+  comment?: Style | Style[];
 
   /**
    * documentation markup within comments, e.g. `@params`
    */
-  doctag: Style | Style[];
+  doctag?: Style | Style[];
 
   /**
    * flags, modifiers, annotations, processing instructions, preprocessor directives, etc
    */
-  meta: Style | Style[];
+  meta?: Style | Style[];
 
   /**
    * REPL or shell prompts or similar
    */
-  'meta.prompt': Style | Style[];
+  'meta.prompt'?: Style | Style[];
 
   /**
    * a keyword inside a meta block (note this is nested, not subscoped)
    */
-  'meta keyword': Style | Style[];
+  'meta keyword'?: Style | Style[];
 
   /**
    * a string inside a meta block (note this is nested, not subscoped)
    */
-  'meta string': Style | Style[];
+  'meta string'?: Style | Style[];
 
   /**
    * heading of a section in a config file, heading in text markup
    */
-  section: Style | Style[];
+  section?: Style | Style[];
 
   /**
    * XML/HTML tag
    */
-  tag: Style | Style[];
+  tag?: Style | Style[];
 
   /**
    * name of an XML tag, the first word in an s-expression
    */
-  name: Style | Style[];
+  name?: Style | Style[];
 
   /**
    * name of an attribute with no language defined semantics (keys in JSON, setting names in .ini), also sub-attribute within another highlighted object, like XML tag
    */
-  attr: Style | Style[];
+  attr?: Style | Style[];
 
   /**
    * name of an attribute followed by a structured value part, like CSS properties
    */
-  attribute: Style | Style[];
+  attribute?: Style | Style[];
 
   /**
    * list item bullet
    */
-  bullet: Style | Style[];
+  bullet?: Style | Style[];
 
   /**
    * code block
    */
-  code: Style | Style[];
+  code?: Style | Style[];
 
   /**
    * emphasis
    */
-  emphasis: Style | Style[];
+  emphasis?: Style | Style[];
 
   /**
    * strong emphasis
    */
-  strong: Style | Style[];
+  strong?: Style | Style[];
 
   /**
    * mathematical formula
    */
-  formula: Style | Style[];
+  formula?: Style | Style[];
 
   /**
    * hyperlink
    */
-  link: Style | Style[];
+  link?: Style | Style[];
 
   /**
    * quotation or blockquote
    */
-  quote: Style | Style[];
+  quote?: Style | Style[];
 
   /**
    * tag selector
    */
-  'selector-tag': Style | Style[];
+  'selector-tag'?: Style | Style[];
 
   /**
    * #id selector
    */
-  'selector-id': Style | Style[];
+  'selector-id'?: Style | Style[];
 
   /**
    * .class selector
    */
-  'selector-class': Style | Style[];
+  'selector-class'?: Style | Style[];
 
   /**
    * [attr] selector
    */
-  'selector-attr': Style | Style[];
+  'selector-attr'?: Style | Style[];
 
   /**
    * :pseudo selector
    */
-  'selector-pseudo': Style | Style[];
+  'selector-pseudo'?: Style | Style[];
 
   /**
    * tag of a template language
    */
-  'template-tag': Style | Style[];
+  'template-tag'?: Style | Style[];
 
   /**
    * variable in a template language
    */
-  'template-variable': Style | Style[];
+  'template-variable'?: Style | Style[];
 
   /**
    * added or changed line
    */
-  addition: Style | Style[];
+  addition?: Style | Style[];
 
   /**
    * deleted line
    */
-  deletion: Style | Style[];
+  deletion?: Style | Style[];
 };
 
 // https://github.com/highlightjs/highlight.js/tree/main/src/styles
