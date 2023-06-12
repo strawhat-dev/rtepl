@@ -4,9 +4,9 @@ import { start } from './index.js';
 
 start({
   useGlobal: true,
-  closeOnSigint: true,
   breakEvalOnSigint: true,
   commands: {
+    quit: ({ repl }) => repl.close(),
     clear: ({ repl }) => repl.write(null, { ctrl: true, name: 'l' }),
   },
 });

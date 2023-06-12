@@ -1,69 +1,10 @@
-import os from 'node:os';
-import REPL from 'node:repl';
-import chalk from 'chalk';
 import parse from 'yargs-parser';
 import findCacheDir from 'find-cache-dir';
-import prettyREPL from './pretty-repl/index.js';
 import { transpileREPL } from './transform/index.js';
+import { displayEnvironmentInfo, extend } from './util.js';
+import prettyREPL, { defaultREPL } from './pretty-repl/index.js';
 
-export const defaultREPL = REPL;
-export const initREPL = (init = {}) => {
-  const stream = init.output || process.stdout;
-  const instance = init.terminal ?? stream.isTTY ? prettyREPL : REPL;
-  const { start } = instance;
-  /** @param {REPL.ReplOptions} options */
-  instance.start = (options = {}) => {
-    const config = { ...defaultConfig, ...init, ...options };
-    const { commands, extensions, closeOnSigint, ...server } = config;
-    server.output ??= stream;
-    server.output.isTTY && (server.prompt ??= chalk.green('> '));
-    const repl = (displayEnvironmentInfo(), start(server));
-    const cache = findCacheDir({ name: 'rtepl', create: true });
-    if (closeOnSigint) repl.on('SIGINT', repl.close);
-    if (cache) {
-      repl.setupHistory(`${cache}/.node_repl_history`, (err) => err && clog`{red ${err}}`);
-    }
-
-    const { eval: $ } = { ...repl };
-    /** @type {REPL.REPLEval} */
-    repl.eval = async (command, ...rest) => {
-      const [commandName, ...argv] = parse(command, parserOptions)._;
-      const args = command.replace(commandName, '').trim();
-      const handleCommand = commands[commandName];
-      if (handleCommand) return handleCommand({ repl, argv, args, command });
-      return $(...(await transpileREPL([command, ...rest], extensions)));
-    };
-
-    return repl;
-  };
-
-  return instance;
-};
-
-const displayEnvironmentInfo = () => {
-  let osInfo = os.version();
-  if (process.platform === 'darwin') {
-    // os.version() on macOS too verbose
-    osInfo = `${process.platform} v${os.release()}`;
-  }
-
-  // prettier-ignore
-  console.log(chalk.green(`
-  node ${process.version}
-  ${osInfo} ${os.machine()}
-  ${os.cpus().pop().model}
-`));
-};
-
-/** @type {import('yargs-parser').Options}  */
-const parserOptions = {
-  configuration: {
-    'parse-numbers': false,
-    'unknown-options-as-args': true,
-  },
-};
-
-/** @type {REPL.ReplOptions}  */
+/** @type {import('repl').ReplOptions} */
 const defaultConfig = {
   theme: 'atom-one-dark',
   extensions: {
@@ -72,4 +13,47 @@ const defaultConfig = {
     staticImports: true,
     redeclarations: true,
   },
+};
+
+/** @type {import('yargs-parser').Options} */
+const parserOptions = {
+  configuration: {
+    'parse-numbers': false,
+    'unknown-options-as-args': true,
+  },
+};
+
+/** @internal */
+export const REPL = defaultREPL;
+
+/** @internal */
+export const initREPL = (init = {}) => {
+  const isTTY = init.terminal ?? (init.output ?? process.stdout)?.isTTY;
+  const instance = isTTY ? prettyREPL : defaultREPL;
+  const { start } = instance;
+  /** @param {import('repl').ReplOptions} options */
+  instance.start = (options = {}) => {
+    const config = { ...defaultConfig, ...init, ...options };
+    const { commands, extensions, ...server } = config;
+    const repl = (displayEnvironmentInfo(), start(server));
+    repl.setupHistory(
+      `${findCacheDir({ name: 'rtepl', create: true })}/.node_repl_history`,
+      (err) => err && $log`{red ${err}}`
+    );
+
+    extend(global, { $repl: repl });
+    const { eval: $ } = { ...repl };
+    /** @type {import('repl').REPLEval} */
+    repl.eval = async (command, ...rest) => {
+      const [commandName, ...argv] = parse(command, parserOptions)._;
+      const handleCommand = commands[commandName];
+      const args = command.replace(commandName, '').trim();
+      if (handleCommand) return handleCommand({ repl, command, args, argv, _: rest });
+      return $(...(await transpileREPL([command, ...rest], extensions)));
+    };
+
+    return repl;
+  };
+
+  return instance;
 };
