@@ -111,34 +111,6 @@ export const getImportDeclaration = ({ name, id, cdn = true }) => {
 };
 
 /**
- * subtree for `import('name')`
- * @param {string} name
- * @returns {import('meriyah').ESTree.ImportExpression}
- */
-const dynamicImportExpression = (name) => ({
-  type: 'ImportExpression',
-  source: { type: 'Literal', value: name },
-});
-
-/**
- * subtree for property access expression.
- * @returns {import('meriyah').ESTree.MemberExpression}
- */
-const getPropertyExpression = ({
-  prop,
-  type = /^\w+$/.test(prop) ? 'Identifier' : 'Literal',
-  computed = type === 'Literal',
-  optional = type === 'Identifier',
-  name = 'global',
-} = {}) => ({
-  type: 'MemberExpression',
-  object: { type: 'Identifier', name },
-  property: { type, [{ Identifier: 'name', Literal: 'value' }[type]]: prop },
-  computed,
-  optional,
-});
-
-/**
  * subtree for conditional assignment in dynamic import body.
  * @param {{ left: import('meriyah').ESTree.MemberExpressionargument: import('meriyah').ESTree.Expression }}
  * @returns {import('meriyah').ESTree.Statement[]}
@@ -182,3 +154,31 @@ const dynamicImportAssignmentBlock = ({ left, argument }) => [
   },
   { type: 'ReturnStatement', argument },
 ];
+
+/**
+ * subtree for `import('name')`
+ * @param {string} name
+ * @returns {import('meriyah').ESTree.ImportExpression}
+ */
+const dynamicImportExpression = (name) => ({
+  type: 'ImportExpression',
+  source: { type: 'Literal', value: name },
+});
+
+/**
+ * subtree for property access expression.
+ * @returns {import('meriyah').ESTree.MemberExpression}
+ */
+const getPropertyExpression = ({
+  prop,
+  type = /^\w+$/.test(prop) ? 'Identifier' : 'Literal',
+  computed = type === 'Literal',
+  optional = type === 'Identifier',
+  name = 'global',
+} = {}) => ({
+  type: 'MemberExpression',
+  object: { type: 'Identifier', name },
+  property: { type, [{ Identifier: 'name', Literal: 'value' }[type]]: prop },
+  computed,
+  optional,
+});
