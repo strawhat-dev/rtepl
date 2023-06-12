@@ -1,6 +1,4 @@
-/* eslint-disable no-control-regex */
-import repl from 'node:repl';
-import { fileURLToPath } from 'node:url';
+import REPL from 'node:repl';
 import stripAnsi from 'strip-ansi';
 import { initHighlighter } from './highlight.js';
 import {
@@ -15,18 +13,50 @@ import {
 const BRACKETS = '()[]{}\'"`$';
 
 // https://github.com/mongodb-js/pretty-repl/blob/master/lib/pretty-repl.js
-class REPLServer extends repl.REPLServer {
+class REPLServer extends REPL.REPLServer {
   /** @param {import('node:repl').ReplOptions} options */
-  constructor({ output, ...options } = {}) {
+  constructor(options = {}) {
+    const colorize = initHighlighter(options);
+    options.prompt ??= colorize.chalk.green('> ');
     super(options);
-    this.lineBeforeInsert = undefined;
+    this.colorize = colorize;
+    this.underline = colorize.chalk.underline;
     this.highlightBracketPosition = -1;
-    this.colorize = initHighlighter({ output, ...options });
+    this.lineBeforeInsert = undefined;
 
-    // For some reason, tests fail if we don't initialize line to be the empty string.
-    // Specifically, `REPLServer.Interface.getCursorPos()` finds itself in a state where `line` is undefined.
-    this.line = '';
-    this.__prettyModuleLoaded = fileURLToPath(import.meta.url);
+    this._doColorize = memoizeTransformer(100, function (str) {
+      return this.colorize(str);
+    });
+
+    this._findAllMatchingBracketsIgnoreMismatches = memoizeTransformer(1000, function (str) {
+      return matchingBrackets(str, true);
+    });
+
+    this._findAllMatchingBracketsIncludeMismatches = memoizeTransformer(1000, function (str) {
+      return matchingBrackets(str, false);
+    });
+
+    this._stripCompleteJSStructures = memoizeTransformer(1000, function (str) {
+      // Remove substructures of the JS input string `str` in order to simplify it,
+      // by removing matching pairs of quotes and parentheses/brackets.
+      // Specifically, remove all but the last, non-nested pair of (), because ()
+      // can affect whether the previous word is seen as a keyword.
+      // E.g.: When input is `function() {`, do not replace the ().
+      //       When input is `{ foo(); }`, do replace the `()`, then afterwards the `{ ... }`.
+      const brackets = this._findAllMatchingBracketsIgnoreMismatches(str);
+      const { kind, parent } = brackets.at(-1) ?? {};
+      kind === '(' && parent?.end === -1 && brackets.pop();
+
+      // Remove brackets in reverse order, so that their indices remain valid.
+      for (let i = brackets.length - 1; i >= 0; --i) {
+        const { parent } = brackets[i];
+        if (parent?.end === -1) {
+          str = `${str.substr(0, brackets[i].start)}${str.substr(brackets[i].end + 1)}`;
+        }
+      }
+
+      return str;
+    });
   }
 
   // If the cursor is moved onto or off a bracket,
@@ -38,44 +68,37 @@ class REPLServer extends repl.REPLServer {
     (cursorWasOnBracket || cursorIsOnBracket) && this._refreshLine();
   }
 
-  // When refreshinng the whole line,
-  // find matching brackets and keep the position
+  // When refreshinng the whole line, find matching brackets and keep the position
   // of the matching one in mind (if there is any).
+  // prettier-ignore
   _refreshLine() {
     try {
-      if (this.colorize?.underline && BRACKETS.includes(this.line[this.cursor])) {
-        this.highlightBracketPosition = this._findMatchingBracket(this.line, this.cursor);
-      }
-
+      this.underline && BRACKETS.includes(this.line[this.cursor]) &&
+      (this.highlightBracketPosition = this._findMatchingBracket(this.line, this.cursor));
       return super._refreshLine();
-    } finally {
-      this.highlightBracketPosition = -1;
-    }
+    } finally { this.highlightBracketPosition = -1; }
   }
 
   _writeToOutput(stringToWrite) {
-    // Skip false-y values, and if we print only whitespace or have not yet
-    // been fully initialized, just write to output directly.
+    // Skip false-y values, and if we print only whitespace or have
+    // not yet been fully initialized, just write to output directly.
     if (!stringToWrite) return;
     if (stringToWrite.match(/^\s+$/) || !this.colorize) {
       this.output.write(stringToWrite);
       return;
     }
 
-    // In this case, the method is being called from _insertString, which appends
-    // a string to the end of the current line.
-    if (
+    // prettier-ignore
+    const appendableString = (
       this.lineBeforeInsert !== undefined &&
       `${this.lineBeforeInsert}${stringToWrite}` === this.line
-    ) {
-      this._writeAppendedString(stringToWrite);
-    } else if (stringToWrite.startsWith(this._prompt)) {
-      this._writeFullLine(stringToWrite);
-    } else {
-      // In other situations, we don't know what to do and
-      // just do whatever the Node.js REPL implementation itself does.
-      super._writeToOutput(stringToWrite);
-    }
+    );
+
+    // In this case, the method is being called from _insertString,
+    // which appends a string to the end of the current line.
+    if (appendableString) this._writeAppendedString(stringToWrite);
+    else if (stringToWrite.startsWith(this._prompt)) this._writeFullLine(stringToWrite);
+    else super._writeToOutput(stringToWrite); // fallback to native REPL implementation
   }
 
   _writeAppendedString(stringToWrite) {
@@ -84,19 +107,15 @@ class REPLServer extends repl.REPLServer {
     // The goal here is to reduce the amount of code that needs to be highlighted,
     // because this typically runs once for each character that is entered.
     const simplified = this._stripCompleteJSStructures(this.lineBeforeInsert);
-
     // Colorize the 'before' state.
     const before = this._doColorize(simplified);
-
     // Colorize the 'after' state, using the same simplification (this works because
     // `lineBeforeInsert + stringToWrite === line` implies that
     // `simplified       + stringToWrite` is a valid simplification of `line`,
     // and the former is a precondition for this method to be called).
-    const after = this._doColorize(`${simplified}${stringToWrite}`);
-
+    const after = this._doColorize(simplified + stringToWrite);
     // Find the first character or escape sequence that differs in `before` and `after`.
     const commonPrefixLength = computeCommonPrefixLength(before, after);
-
     // Gather all escape sequences that occur in the *common* part of the string.
     // Applying them all one after another puts the terminal into the state of the
     // highlighting at the divergence point.
@@ -104,25 +123,22 @@ class REPLServer extends repl.REPLServer {
     // not e.g. cursor position, which seem like a reasonable assumption to make
     // for the output from a syntax highlighter).
     let ansiStatements = before.slice(0, commonPrefixLength).match(ansiRegex) || [];
-
     // Filter out any foreground color settings before the last reset (\x1b[39m).
     // This helps reduce the amount of useless clutter we write a bit, and in
     // particular helps the mongosh test suite not ReDOS itself when verifying
     // output coloring.
-    const lastForegroundColorResetIndex = ansiStatements.lastIndexOf('\x1b[39m');
-    if (lastForegroundColorResetIndex !== -1) {
-      // Keep escape sequences that come after the last full reset or modify
-      // something other than the foreground color.
+    const lastForegroundColorReset = ansiStatements.lastIndexOf('\x1b[39m');
+    if (lastForegroundColorReset !== -1) {
       ansiStatements = ansiStatements.filter(
-        (sequence, i) => i > lastForegroundColorResetIndex || !sequence.match(/^\x1b\[3\d.*m$/)
+        (sequence, i) => i > lastForegroundColorReset || !sequence.match(/^\x1b\[3\d.*m$/)
       );
     }
 
     // In order to get from `before` to `after`, we have to reduce the `before` state
-    // back to the common prefix of the two. Do that by counting all the non-escape
-    // sequence characters in what comes after the common prefix in `before`.
+    // back to the common prefix of the two. Do that by counting all the
+    // non-escape-sequence characters in what comes after the common prefix
+    // in `before`.
     const backtrackLength = characterCount(stripAnsi(before.slice(commonPrefixLength)));
-
     // Put it all together: Backtrack from `before` to the common prefix, apply
     // all the escape sequences that were present before, and then apply the
     // new output from `after`.
@@ -151,7 +167,7 @@ class REPLServer extends repl.REPLServer {
 
       // Then remove the BOM characters again and colorize the bracket in between.
       stringToWrite = stringToWrite.replace(/\ufeff(.+)\ufeff/, (_, bracket) =>
-        this.colorize?.underline?.(bracket)
+        this.underline(bracket)
       );
     } else stringToWrite = this._doColorize(stringToWrite);
 
@@ -165,41 +181,6 @@ class REPLServer extends repl.REPLServer {
     finally { this.lineBeforeInsert = undefined; }
   }
 
-  _doColorize = memoizeTransformer(100, function (str) {
-    return this.colorize(str);
-  });
-
-  _stripCompleteJSStructures = memoizeTransformer(1000, function (str) {
-    // Remove substructures of the JS input string `str` in order to simplify it,
-    // by removing matching pairs of quotes and parentheses/brackets.
-    // Specifically, remove all but the last, non-nested pair of (), because ()
-    // can affect whether the previous word is seen as a keyword.
-    // E.g.: When input is `function() {`, do not replace the ().
-    //       When input is `{ foo(); }`, do replace the `()`, then afterwards the `{ ... }`.
-    const brackets = this._findAllMatchingBracketsIgnoreMismatches(str);
-    const last = brackets.at(-1);
-    if (last?.kind === '(' && (!last.parent || last.parent.end === -1)) {
-      brackets.pop();
-    }
-
-    // Remove brackets in reverse order, so that their indices remain valid.
-    for (let i = brackets.length - 1; i >= 0; --i) {
-      const { parent } = brackets[i];
-      // Skip brackets which are contained in outer brackets that will also be removed.
-      if (parent && parent.end !== -1) continue;
-      str = `${str.substr(0, brackets[i].start)}${str.substr(brackets[i].end + 1)}`;
-    }
-
-    return str;
-  });
-
-  _findAllMatchingBracketsIgnoreMismatches = memoizeTransformer(1000, function (str) {
-    return matchingBrackets(str, true);
-  });
-  _findAllMatchingBracketsIncludeMismatches = memoizeTransformer(1000, function (str) {
-    return matchingBrackets(str, false);
-  });
-
   // Find the matching bracket opposite of the one at `position`.
   _findMatchingBracket(line, position) {
     const brackets = this._findAllMatchingBracketsIncludeMismatches(line);
@@ -212,4 +193,5 @@ class REPLServer extends repl.REPLServer {
   }
 }
 
+export const defaultREPL = REPL;
 export default { REPLServer, start: (options) => new REPLServer(options) };
