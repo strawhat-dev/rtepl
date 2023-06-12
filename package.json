@@ -6,10 +6,10 @@
   "repository": "github:strawhat-dev/rtepl",
   "description": "Read-[transpile]-Eval-Print-Loop w/ syntax highlighting",
   "type": "module",
-  "bin": "./src/cli.js",
   "module": "./src/index.js",
   "exports": "./src/index.js",
   "types": "./src/index.d.ts",
+  "bin": "./src/cli.js",
   "files": [
     "src"
   ],
@@ -29,7 +29,6 @@
     "emphasize": "^6.0.0",
     "find-cache-dir": "^4.0.0",
     "highlight.js": "^11.8.0",
-    "ink": "^4.2.0",
     "meriyah": "^4.3.7",
     "strip-ansi": "^7.1.0",
     "yargs-parser": "^21.1.1"
@@ -37,14 +36,18 @@
   "devDependencies": {
     "@types/eslint": "^8.40.1",
     "@types/find-cache-dir": "^3.2.1",
-    "@types/node": "^20.2.5",
+    "@types/node": "^20.3.0",
     "@types/yargs-parser": "^21.0.0",
     "eslint": "^8.42.0",
     "prettier": "^2.8.8"
   },
-  "np": {
-    "branch": "main",
-    "tests": false
+  "peerDependencies": {
+    "ink": "^4.2.0"
+  },
+  "peerDependenciesMeta": {
+    "ink": {
+      "optional": true
+    }
   },
   "prettier": {
     "printWidth": 100,

@@ -6,12 +6,7 @@
     "moduleResolution": "nodenext",
     "noEmit": true,
     "allowJs": true,
-    "incremental": true,
     "skipLibCheck": true,
-    "isolatedModules": true,
-    "esModuleInterop": true,
-    "resolveJsonModule": true,
-    "allowSyntheticDefaultImports": true,
-    "forceConsistentCasingInFileNames": true
+    "verbatimModuleSyntax": true
   }
 }

@@ -1,9 +1,12 @@
 /** @type {import('eslint').Linter.Config} */
 module.exports = {
   root: true,
-  rules: { 'no-empty': 0 },
+  env: { node: true, es2022: true },
   extends: ['eslint:recommended'],
-  env: { es2022: true, node: true },
-  globals: { clog: 'readonly', rtepl_cdn_imports: 'readonly' },
-  parserOptions: { sourceType: 'module', ecmaVersion: 'latest' },
+  parserOptions: { sourceType: 'module' },
+  globals: { $repl: 'readonly', $log: 'readonly' },
+  rules: {
+    'no-empty': 0,
+    'no-control-regex': 0,
+  },
 };
