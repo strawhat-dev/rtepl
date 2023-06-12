@@ -38,7 +38,7 @@ export const initREPL = (init = {}) => {
     const repl = (displayEnvironmentInfo(), start(server));
     repl.setupHistory(
       `${findCacheDir({ name: 'rtepl', create: true })}/.node_repl_history`,
-      (err) => err && $log`{red ${err}}`
+      () => {}
     );
 
     extend(global, { $repl: repl });
