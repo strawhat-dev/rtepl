@@ -7,9 +7,9 @@ const tsconfig = {
   minify: false,
   loader: 'tsx',
   format: 'esm',
-  jsx: 'automatic',
-  target: 'node16',
   platform: 'node',
+  target: 'node16',
+  jsx: 'automatic',
   define: { require: 'global.require' },
   tsconfigRaw: { compilerOptions: { preserveValueImports: true } },
 };
@@ -27,9 +27,8 @@ export const esbuild = async (code, file) => {
  * @param {string} code
  * @param {import('repl').ReplOptions['extensions']} opts
  */
-// prettier-ignore
 export const shouldSkipParsing = (code, opts) => (
-  !/\b(let|const|import|require)\b/.test(code) || // naive check
+  !/(\$`|\b(let|const|import|require)\b)/.test(code) || // naive check
   !Object.values(opts).some((enabled) => enabled)
 );
 

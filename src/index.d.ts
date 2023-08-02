@@ -1,12 +1,20 @@
 import type repl from 'node:repl';
+import type { PlatformPath } from 'node:path/posix';
 import type { ColorName, ModifierName } from 'chalk';
+import type { ExecaReturnValue, TemplateExpression } from 'execa';
 
 declare global {
-  /** currently active repl instance. */
+  /** Currently active repl instance. */
   var $repl: repl.REPLServer;
 
-  /** utility logger as tagged template function w/ `chalk` support. */
-  var $log: (template: TemplateStringsArray, ...subs: unknown[]) => void;
+  /** Cross-platform path module, based on {@link https://github.com/anodynos/upath} */
+  var $path: PlatformPath;
+
+  /** Utility logger as tagged template function w/ `chalk` support. */
+  var $log: (template: TemplateStringsArray, ...subs: TemplateExpression[]) => void;
+
+  /** Wrapped execa executor for active repl instance. */
+  var $: (t: TemplateStringsArray, ...subs: TemplateExpression[]) => Promise<ExecaReturnValue>;
 }
 
 type REPL = typeof repl;
@@ -15,55 +23,59 @@ declare module 'repl' {
   interface ReplOptions extends repl.ReplOptions {
     /**
      * The name of the theme to use (provided by `hljs` stylesheets).
-     * @see {@link https://github.com/highlightjs/highlight.js/tree/main/src/styles}
+     *
      * @defaultValue `'atom-one-dark'`
+     * @see {@link https://github.com/highlightjs/highlight.js/tree/main/src/styles}
      */
     theme?: Theme;
     /**
-     * A configuration object that maps `hljs` classes to a single
-     * or array of `chalk` color/modifier names *(or hex values)*,
-     * used for more advanced customization of syntax styling.
+     * A configuration object that maps `hljs` classes to a single or array of `chalk`
+     * color/modifier names _(or hex values)_, used for more advanced customization of syntax styling.
+     *
      * - Can be used in conjunction with the `theme` option, which will be merged.
      */
     sheet?: SheetConfig;
     /**
-     * Define commands to be handled with a custom callback instead of the repl server when a matching command name is given.
-     * - Note: Differs from commands defined by the native `repl.defineCommand`, in that the `'.'` prefix is not needed.
+     * Define commands to be handled with a custom callback instead of the repl server when a
+     * matching command name is given.
+     *
+     * - Note: Differs from commands defined by the native `repl.defineCommand`, in that the `'.'`
+     *   prefix is not needed.
+     *
      * @example
-     * repl.start({
-     *   commands: {
-     *     clear: ({ repl }) => repl.write(null, { ctrl: true, name: 'l' })
-     *   }
-     * })
+     *   repl.start({
+     *     commands: {
+     *       clear: ({ repl }) => repl.write(null, { ctrl: true, name: 'l' }),
+     *     },
+     *   });
      */
     commands?: { [command: string]: (cmd: CommandEvent) => void };
     /**
-     * Extensions that affect transpilation process. Commands that would normally be invalid in the repl context
-     * may be transpiled to compatible code, allowing for quick prototyping and flexibility while testing snippets.
+     * Extensions that affect transpilation process. Commands that would normally be invalid in the
+     * repl context may be transpiled to compatible code, allowing for quick prototyping and
+     * flexibility while testing snippets.
+     *
      * @defaultValue All options are `true` by default, *unless `extensions` is explicitly given and overridden by the user*.
      */
     extensions?: {
       /**
-       * Automatically use a cdn (jsdelivr) for all imports when
-       * the imported module is not a node built-in, or the module
-       * cannot be resolved from the current working directory.
+       * Automatically use a cdn (jsdelivr) for all imports when the imported module is not a node
+       * built-in, or the module cannot be resolved from the current working directory.
+       *
        * - Note: `--experimental-network-imports` flag must be enabled
        */
       cdn?: boolean;
       /**
-       * Allow redeclaring `let` & `const`, similarily to the DevTools console. \
-       * *(Converts all unscoped declarations to `var`)*
+       * Allow redeclaring `let` & `const`, similarily to the DevTools console.\
+       * _(Converts all unscoped declarations to `var`)_
        */
       redeclarations?: boolean;
-      /**
-       * Allow for static import syntax
-       * *(which will be transpiled to dynamic imports if enabled)*.
-       */
+      /** Allow for static import syntax _(which will be transpiled to dynamic imports if enabled)_. */
       staticImports?: boolean;
       /**
        * Enable transpiling typescript with esbuild.
-       * - Note: Unlike `ts-node`'s repl, this does **not**
-       *   perform any typechecking (similarly to `tsx`).
+       *
+       * - Note: Unlike `ts-node`'s repl, this does **not** perform any typechecking (similarly to `tsx`).
        */
       typescript?: boolean;
     };
@@ -83,264 +95,163 @@ export type Style = ColorName | ModifierName | `#${string}`;
 export type SheetConfig = {
   [className?: string]: Style | Style[];
 
-  /**
-   * fallback value
-   */
+  /** Fallback value */
   default?: Style | Style[];
 
-  /**
-   * keyword in a regular Algol-style language
-   */
+  /** Keyword in a regular Algol-style language */
   keyword?: Style | Style[];
 
-  /**
-   * built-in or library object (constant, class, function)
-   */
+  /** Built-in or library object (constant, class, function) */
   built_in?: Style | Style[];
 
-  /**
-   * data type (in a language with syntactically significant types) (`string`, `int`, `array`, etc.)
-   */
+  /** Data type (in a language with syntactically significant types) (`string`, `int`, `array`, etc.) */
   type?: Style | Style[];
 
-  /**
-   * special identifier for a built-in value (`true`, `false`, `null`, etc.)
-   */
+  /** Special identifier for a built-in value (`true`, `false`, `null`, etc.) */
   literal?: Style | Style[];
 
-  /**
-   * number, including units and modifiers, if any.
-   */
+  /** Number, including units and modifiers, if any. */
   number?: Style | Style[];
 
-  /**
-   * operators: `+`, `-`, `>>`, `|`, `==`
-   */
+  /** Operators: `+`, `-`, `>>`, `|`, `==` */
   operator?: Style | Style[];
 
-  /**
-   * aux. punctuation that should be subtly highlighted (parentheses, brackets, etc.)
-   */
+  /** Aux. punctuation that should be subtly highlighted (parentheses, brackets, etc.) */
   punctuation?: Style | Style[];
 
-  /**
-   * object property `obj.prop1.prop2.value`
-   */
+  /** Object property `obj.prop1.prop2.value` */
   property?: Style | Style[];
 
-  /**
-   * literal regular expression
-   */
+  /** Literal regular expression */
   regexp?: Style | Style[];
 
-  /**
-   * literal string, character
-   */
+  /** Literal string, character */
   string?: Style | Style[];
 
-  /**
-   * an escape character such as `\n`
-   */
+  /** An escape character such as `\n` */
   'char.escape'?: Style | Style[];
 
-  /**
-   * parsed section inside a literal string
-   */
+  /** Parsed section inside a literal string */
   subst?: Style | Style[];
 
-  /**
-   * symbolic constant, interned string, goto label
-   */
+  /** Symbolic constant, interned string, goto label */
   symbol?: Style | Style[];
 
-  /**
-   * **deprecated** You probably want `title.class`
-   */
+  /** **deprecated** You probably want `title.class` */
   class?: Style | Style[];
 
-  /**
-   * **deprecated** You probably want `title.function`
-   */
+  /** **deprecated** You probably want `title.function` */
   function?: Style | Style[];
 
-  /**
-   * variables
-   */
+  /** Variables */
   variable?: Style | Style[];
 
-  /**
-   * variable with special meaning in a language, e.g.: `this`, `window`, `super`, `self`, etc.
-   */
+  /** Variable with special meaning in a language, e.g.: `this`, `window`, `super`, `self`, etc. */
   'variable.language'?: Style | Style[];
 
-  /**
-   * variable that is a constant value, ie `MAX_FILES`
-   */
+  /** Variable that is a constant value, ie `MAX_FILES` */
   'variable.constant'?: Style | Style[];
 
-  /**
-   * name of a class or a function
-   */
+  /** Name of a class or a function */
   title?: Style | Style[];
 
-  /**
-   * name of a class (interface, trait, module, etc)
-   */
+  /** Name of a class (interface, trait, module, etc) */
   'title.class'?: Style | Style[];
 
-  /**
-   * name of class being inherited from, extended, etc.
-   */
+  /** Name of class being inherited from, extended, etc. */
   'title.class.inherited'?: Style | Style[];
 
-  /**
-   * name of a function
-   */
+  /** Name of a function */
   'title.function'?: Style | Style[];
 
-  /**
-   * name of a function (when being invoked)
-   */
+  /** Name of a function (when being invoked) */
   'title.function.invoke'?: Style | Style[];
 
-  /**
-   * block of function arguments (parameters) at the place of declaration
-   */
+  /** Block of function arguments (parameters) at the place of declaration */
   params?: Style | Style[];
 
-  /**
-   * comments
-   */
+  /** Comments */
   comment?: Style | Style[];
 
-  /**
-   * documentation markup within comments, e.g. `@params`
-   */
+  /** Documentation markup within comments, e.g. `@params` */
   doctag?: Style | Style[];
 
-  /**
-   * flags, modifiers, annotations, processing instructions, preprocessor directives, etc
-   */
+  /** Flags, modifiers, annotations, processing instructions, preprocessor directives, etc */
   meta?: Style | Style[];
 
-  /**
-   * REPL or shell prompts or similar
-   */
+  /** REPL or shell prompts or similar */
   'meta.prompt'?: Style | Style[];
 
-  /**
-   * a keyword inside a meta block (note this is nested, not subscoped)
-   */
+  /** A keyword inside a meta block (note this is nested, not subscoped) */
   'meta keyword'?: Style | Style[];
 
-  /**
-   * a string inside a meta block (note this is nested, not subscoped)
-   */
+  /** A string inside a meta block (note this is nested, not subscoped) */
   'meta string'?: Style | Style[];
 
-  /**
-   * heading of a section in a config file, heading in text markup
-   */
+  /** Heading of a section in a config file, heading in text markup */
   section?: Style | Style[];
 
-  /**
-   * XML/HTML tag
-   */
+  /** XML/HTML tag */
   tag?: Style | Style[];
 
-  /**
-   * name of an XML tag, the first word in an s-expression
-   */
+  /** Name of an XML tag, the first word in an s-expression */
   name?: Style | Style[];
 
   /**
-   * name of an attribute with no language defined semantics (keys in JSON, setting names in .ini), also sub-attribute within another highlighted object, like XML tag
+   * Name of an attribute with no language defined semantics (keys in JSON, setting names in .ini),
+   * also sub-attribute within another highlighted object, like XML tag
    */
   attr?: Style | Style[];
 
-  /**
-   * name of an attribute followed by a structured value part, like CSS properties
-   */
+  /** Name of an attribute followed by a structured value part, like CSS properties */
   attribute?: Style | Style[];
 
-  /**
-   * list item bullet
-   */
+  /** List item bullet */
   bullet?: Style | Style[];
 
-  /**
-   * code block
-   */
+  /** Code block */
   code?: Style | Style[];
 
-  /**
-   * emphasis
-   */
+  /** Emphasis */
   emphasis?: Style | Style[];
 
-  /**
-   * strong emphasis
-   */
+  /** Strong emphasis */
   strong?: Style | Style[];
 
-  /**
-   * mathematical formula
-   */
+  /** Mathematical formula */
   formula?: Style | Style[];
 
-  /**
-   * hyperlink
-   */
+  /** Hyperlink */
   link?: Style | Style[];
 
-  /**
-   * quotation or blockquote
-   */
+  /** Quotation or blockquote */
   quote?: Style | Style[];
 
-  /**
-   * tag selector
-   */
+  /** Tag selector */
   'selector-tag'?: Style | Style[];
 
-  /**
-   * #id selector
-   */
+  /** #id selector */
   'selector-id'?: Style | Style[];
 
-  /**
-   * .class selector
-   */
+  /** .class selector */
   'selector-class'?: Style | Style[];
 
-  /**
-   * [attr] selector
-   */
+  /** [attr] selector */
   'selector-attr'?: Style | Style[];
 
-  /**
-   * :pseudo selector
-   */
+  /** :pseudo selector */
   'selector-pseudo'?: Style | Style[];
 
-  /**
-   * tag of a template language
-   */
+  /** Tag of a template language */
   'template-tag'?: Style | Style[];
 
-  /**
-   * variable in a template language
-   */
+  /** Variable in a template language */
   'template-variable'?: Style | Style[];
 
-  /**
-   * added or changed line
-   */
+  /** Added or changed line */
   addition?: Style | Style[];
 
-  /**
-   * deleted line
-   */
+  /** Deleted line */
   deletion?: Style | Style[];
 };
 

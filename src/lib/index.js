@@ -1,65 +1,42 @@
-import parse from 'yargs-parser';
-import findCacheDir from 'find-cache-dir';
+import parseCommand from 'yargs-parser';
+import $path from './path/index.js';
 import { transpileREPL } from './transform/index.js';
-import { displayEnvironmentInfo, extend } from './util.js';
 import prettyREPL, { defaultREPL } from './pretty-repl/index.js';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import { displayEnvironmentInfo, extend, withExec, withHistory } from './util.js';
+import { defaultConfig, parserOptions } from './config.js';
 
-/** @type {import('repl').ReplOptions} */
-const defaultConfig = {
-  theme: 'atom-one-dark',
-  extensions: {
-    cdn: true,
-    typescript: true,
-    staticImports: true,
-    redeclarations: true,
-  },
-};
-
-/** @type {import('yargs-parser').Options} */
-const parserOptions = {
-  configuration: {
-    'parse-numbers': false,
-    'unknown-options-as-args': true,
-  },
-};
-
-/** @internal */
 export const REPL = defaultREPL;
 
-/** @internal */
 export const initREPL = (init = {}) => {
   const isTTY = init.terminal ?? (init.output ?? process.stdout)?.isTTY;
   const instance = isTTY ? prettyREPL : defaultREPL;
-  const { start } = instance;
+  const start = instance.start.bind(instance);
   /** @param {import('repl').ReplOptions} options */
   instance.start = (options = {}) => {
     const config = { ...defaultConfig, ...init, ...options };
     const { commands, extensions, ...server } = config;
-    const repl = (displayEnvironmentInfo(), start(server));
-    repl.setupHistory(
-      `${findCacheDir({
-        name: 'rtepl',
-        create: true,
-        cwd: dirname(fileURLToPath(import.meta.url)),
-      })}/.node_repl_history`,
-      () => 0
-    );
-
-    extend(global, { $repl: repl });
-    const { eval: $ } = { ...repl };
+    const repl = (displayEnvironmentInfo(), withHistory(start(server)));
+    extend(global, { $repl: repl, $: withExec(repl), $path, $resolve_global_module });
+    repl._domain.on('error', () => (repl.setErrorPrompt(), repl.displayPrompt(true)));
+    const handleREPL = repl.eval.bind(repl);
     /** @type {import('repl').REPLEval} */
     repl.eval = async (command, ...rest) => {
-      const [commandName, ...argv] = parse(command, parserOptions)._;
-      const handleCommand = commands[commandName];
+      repl.setDefaultPrompt();
+      const [commandName, ...argv] = parseCommand(command, parserOptions)._;
+      const handleCommand = commands?.[commandName];
       const args = command.replace(commandName, '').trim();
       if (handleCommand) return handleCommand({ repl, command, args, argv, _: rest });
-      return $(...(await transpileREPL([command, ...rest], extensions)));
+      return handleREPL(...(await transpileREPL([command, ...rest], extensions)));
     };
 
     return repl;
   };
 
   return instance;
+};
+
+const $resolve_global_module = (key, defaultImport, namedImport) => {
+  const mod = global[key];
+  defaultImport && (global[defaultImport] = mod.default ?? mod);
+  return namedImport in mod ? mod : mod.default;
 };

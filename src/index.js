@@ -1,4 +1,4 @@
-import { REPL, initREPL } from './lib/index.js';
+import { initREPL, REPL } from './lib/index.js';
 
 export const { REPL_MODE_SLOPPY, REPL_MODE_STRICT, Recoverable, writer } = REPL;
 export const start = (options) => initREPL(options).start(options);

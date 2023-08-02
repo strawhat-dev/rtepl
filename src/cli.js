@@ -3,10 +3,29 @@
 import { start } from './index.js';
 
 start({
-  useGlobal: true,
   breakEvalOnSigint: true,
   commands: {
-    quit: ({ repl }) => (repl.close(), process.exit()),
+    exit: ({ repl }) => (repl.close(), process.exit()),
     clear: ({ repl }) => repl.write(null, { ctrl: true, name: 'l' }),
+    pwd({ repl }) {
+      repl.clearBufferedCommand();
+      $log`{blue.underline ${$path.normalize(process.cwd())}}`;
+      repl.displayPrompt(true);
+    },
+    ls({ argv }) {
+      const flags = ['-A ', '--color=auto', '--classify=auto', '--group-directories-first'];
+      $`ls ${[...flags, ...argv]}`;
+    },
+    cd({ repl, args }) {
+      try {
+        repl.clearBufferedCommand();
+        process.chdir($path.normalize(args));
+        $log`{blue.underline ${$path.normalize(process.cwd())}}`;
+      } catch (_) {
+        repl.setErrorPrompt();
+      } finally {
+        repl.displayPrompt(true);
+      }
+    },
   },
 });

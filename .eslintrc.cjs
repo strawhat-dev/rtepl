@@ -4,9 +4,6 @@ module.exports = {
   env: { node: true, es2022: true },
   extends: ['eslint:recommended'],
   parserOptions: { sourceType: 'module' },
-  globals: { $repl: 'readonly', $log: 'readonly' },
-  rules: {
-    'no-empty': 0,
-    'no-control-regex': 0,
-  },
+  rules: { 'no-empty': 0, 'no-control-regex': 0 },
+  globals: { $: 'readonly', $repl: 'readonly', $path: 'readonly', $log: 'readonly' },
 };

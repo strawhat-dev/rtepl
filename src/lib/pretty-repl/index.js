@@ -16,27 +16,33 @@ const BRACKETS = '()[]{}\'"`$';
 class REPLServer extends REPL.REPLServer {
   /** @param {import('node:repl').ReplOptions} options */
   constructor(options = {}) {
-    const colorize = initHighlighter(options);
-    options.prompt ??= colorize.chalk.green('> ');
+    const { colorize, chalk } = initHighlighter(options);
+    const promptChar = options.prompt || '> ';
+    const $prompt = { default: chalk.green(promptChar), error: chalk.red(promptChar) };
+    options.prompt = $prompt.default;
     super(options);
+
+    /** @type {keyof $prompt} */
+    this.state = 'default';
+    this.$prompt = $prompt;
     this.colorize = colorize;
-    this.underline = colorize.chalk.underline;
+    this.underline = chalk.underline;
     this.highlightBracketPosition = -1;
     this.lineBeforeInsert = undefined;
 
-    this._doColorize = memoizeTransformer(100, function (str) {
+    this._doColorize = memoizeTransformer(100, function(str) {
       return this.colorize(str);
     });
 
-    this._findAllMatchingBracketsIgnoreMismatches = memoizeTransformer(1000, function (str) {
+    this._findAllMatchingBracketsIgnoreMismatches = memoizeTransformer(1000, function(str) {
       return matchingBrackets(str, true);
     });
 
-    this._findAllMatchingBracketsIncludeMismatches = memoizeTransformer(1000, function (str) {
+    this._findAllMatchingBracketsIncludeMismatches = memoizeTransformer(1000, function(str) {
       return matchingBrackets(str, false);
     });
 
-    this._stripCompleteJSStructures = memoizeTransformer(1000, function (str) {
+    this._stripCompleteJSStructures = memoizeTransformer(1000, function(str) {
       // Remove substructures of the JS input string `str` in order to simplify it,
       // by removing matching pairs of quotes and parentheses/brackets.
       // Specifically, remove all but the last, non-nested pair of (), because ()
@@ -57,6 +63,24 @@ class REPLServer extends REPL.REPLServer {
 
       return str;
     });
+  }
+
+  applyPromptState() {
+    super.setPrompt(this.$prompt[this.state]);
+  }
+
+  setDefaultPrompt() {
+    if (this.state !== 'default') {
+      this.state = 'default';
+      this.applyPromptState();
+    }
+  }
+
+  setErrorPrompt() {
+    if (this.state !== 'error') {
+      this.state = 'error';
+      this.applyPromptState();
+    }
   }
 
   // If the cursor is moved onto or off a bracket,
@@ -166,8 +190,9 @@ class REPLServer extends REPL.REPLServer {
       );
 
       // Then remove the BOM characters again and colorize the bracket in between.
-      stringToWrite = stringToWrite.replace(/\ufeff(.+)\ufeff/, (_, bracket) =>
-        this.underline(bracket)
+      stringToWrite = stringToWrite.replace(
+        /\ufeff(.+)\ufeff/,
+        (_, bracket) => this.underline(bracket)
       );
     } else stringToWrite = this._doColorize(stringToWrite);
 
