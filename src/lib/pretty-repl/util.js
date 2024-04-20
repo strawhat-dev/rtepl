@@ -15,7 +15,7 @@ const QUOTE_PAIRS = ["''", '""', '``'];
 export const characterCount = (str) => {
   let count = 0;
   for (let i = 0; i < str.length; ++i) {
-    (str.charCodeAt(i) < 0xd800 || str.charCodeAt(i) >= 0xdc00) && ++count;
+    count += str.charCodeAt(i) < 0xd800 || str.charCodeAt(i) >= 0xdc00;
   }
 
   return count;
@@ -41,27 +41,6 @@ export const computeCommonPrefixLength = (before, after) => {
   }
 
   return i;
-};
-
-/**
- * Helper function that converts functions into memoized
- * versions of themselves with a fixed-size LRU cache. \
- * {@link https://github.com/mongodb-js/pretty-repl/blob/main/lib/memoize-string-transformer.js}
- */
-export const memoizeTransformer = (maxSize, fn) => {
-  const cache = new Map();
-  /** @param {string} s */
-  return function (str) {
-    if (cache.has(str)) return cache.get(str);
-    const ret = fn.call(this, str);
-    cache.set(str, ret);
-    if (cache.size > maxSize) {
-      const [[oldestKey]] = cache;
-      cache.delete(oldestKey);
-    }
-
-    return ret;
-  };
 };
 
 /**

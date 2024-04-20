@@ -1,17 +1,9 @@
 import type repl from 'node:repl';
-import type { PlatformPath } from 'node:path/posix';
-import type { ColorName, ModifierName } from 'chalk';
 import type { ExecaReturnValue, TemplateExpression } from 'execa';
 
 declare global {
   /** Currently active repl instance. */
   var $repl: repl.REPLServer;
-
-  /** Cross-platform path module, based on {@link https://github.com/anodynos/upath} */
-  var $path: PlatformPath;
-
-  /** Utility logger as tagged template function w/ `chalk` support. */
-  var $log: (template: TemplateStringsArray, ...subs: TemplateExpression[]) => void;
 
   /** Wrapped execa executor for active repl instance. */
   var $: (t: TemplateStringsArray, ...subs: TemplateExpression[]) => Promise<ExecaReturnValue>;
@@ -91,7 +83,7 @@ export declare const REPL_MODE_STRICT: REPL['REPL_MODE_STRICT'];
 
 // exported type definitions
 export type * from 'node:repl';
-export type Style = ColorName | ModifierName | `#${string}`;
+export type Style = import('ansis').AnsiColors | import('ansis').AnsiStyles | `#${string}`;
 export type SheetConfig = {
   [className?: string]: Style | Style[];
 

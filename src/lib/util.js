@@ -1,10 +1,34 @@
-import { fileURLToPath } from 'node:url';
-import { dirname } from 'node:path';
 import os from 'node:os';
-import chalk from 'chalk';
 import { $ } from 'execa';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import findCacheDir from 'find-cache-dir';
 import { execOptions } from './config.js';
+import { green } from './ansi.js';
+
+const { keys, defineProperty } = Object;
+
+export const asArray = (x) => Array.isArray(x) ? x : x == null ? [] : [x];
+
+export const reduce = (...args) => {
+  if (args.length < 3) return (res) => reduce(res, ...args);
+  const [arr, init = {}, resolve] = args;
+  return arr.reduce((acc, x, i) => resolve(acc, x, i) ?? acc, init) ?? init;
+};
+
+export const foreach = (arr, callback) => {
+  if (!arr) return [];
+  const len = arr.length;
+  for (let i = 0; i < len; ++i) callback(arr[i], i);
+};
+
+export const entries = (obj) => {
+  if (!obj) return [];
+  const ret = keys(obj);
+  const len = ret.length;
+  for (let i = 0; i < len; ++i) ret[i] = [ret[i], obj[ret[i]]];
+  return ret;
+};
 
 /**
  * @template {object} T
@@ -13,11 +37,11 @@ import { execOptions } from './config.js';
  * @param {Readonly<Props>} props
  * @returns {T & Props}
  */
-export const extend = (target, props) => {
+export const define = (target, props) => {
   props ?? ([target, props] = [{}, target]);
-  for (const key of Object.keys(props)) {
+  for (const key of keys(props)) {
     const value = props[key];
-    Object.defineProperty(target, key, { value });
+    defineProperty(target, key, { value });
   }
 
   return target;
@@ -35,7 +59,7 @@ export const withHistory = (repl) => {
 };
 
 /** @param {import('repl').REPLServer} repl */
-export const withExec = (repl) => {
+export const replExec = (repl) => {
   const exec = $(execOptions);
   return async (...args) => {
     const cmd = exec(...args);
@@ -49,27 +73,14 @@ export const withExec = (repl) => {
 
 export const displayEnvironmentInfo = () => {
   let osInfo = os.version();
-
   // os.version() on macOS too verbose
   if (process.platform === 'darwin') {
     osInfo = `${process.platform} v${os.release()}`;
   }
 
-  console.log(chalk.green(`
+  console.log(green`
   node ${process.version}
   ${osInfo} ${os.machine()}
   ${os.cpus().pop().model}
-`));
-};
-
-export const re = (raw, ...subs) => {
-  let pattern = String.raw({ raw }, ...subs.map(escapeRegexStr));
-  const flags = (pattern.match(RE_FLAG_PATTERN) || [''])[0].slice(1);
-  flags && (pattern = pattern.replace(RE_FLAG_PATTERN, ''));
-  return new RegExp(pattern, flags);
-};
-
-const RE_FLAG_PATTERN = /[/]\b(?!\w*(\w)\w*\1)[dgimsuy]+\b$/;
-const escapeRegexStr = (s) => {
-  return s?.toString().replace(/[|\\{}()[\]^$+*?.]/g, '\\$&').replace(/-/g, '\\x2d');
+  `);
 };

@@ -1,13 +1,7 @@
 import REPL from 'node:repl';
-import stripAnsi from 'strip-ansi';
+import memoize from 'memoize-one';
 import { initHighlighter } from './highlight.js';
-import {
-  ansiRegex,
-  characterCount,
-  computeCommonPrefixLength,
-  matchingBrackets,
-  memoizeTransformer,
-} from './util.js';
+import { ansiRegex, characterCount, computeCommonPrefixLength, matchingBrackets } from './util.js';
 
 // Every open/close pair that should be matched against its counterpart for highlighting.
 const BRACKETS = '()[]{}\'"`$';
@@ -16,33 +10,25 @@ const BRACKETS = '()[]{}\'"`$';
 class REPLServer extends REPL.REPLServer {
   /** @param {import('node:repl').ReplOptions} options */
   constructor(options = {}) {
-    const { colorize, chalk } = initHighlighter(options);
+    const { ansi, colorize } = initHighlighter(options);
     const promptChar = options.prompt || '> ';
-    const $prompt = { default: chalk.green(promptChar), error: chalk.red(promptChar) };
+    const $prompt = { default: ansi.green(promptChar), error: ansi.red(promptChar) };
     options.prompt = $prompt.default;
     super(options);
 
     /** @type {keyof $prompt} */
+    this.ansi = ansi;
     this.state = 'default';
     this.$prompt = $prompt;
     this.colorize = colorize;
-    this.underline = chalk.underline;
+    this.underline = ansi.underline;
     this.highlightBracketPosition = -1;
     this.lineBeforeInsert = undefined;
 
-    this._doColorize = memoizeTransformer(100, function(str) {
-      return this.colorize(str);
-    });
-
-    this._findAllMatchingBracketsIgnoreMismatches = memoizeTransformer(1000, function(str) {
-      return matchingBrackets(str, true);
-    });
-
-    this._findAllMatchingBracketsIncludeMismatches = memoizeTransformer(1000, function(str) {
-      return matchingBrackets(str, false);
-    });
-
-    this._stripCompleteJSStructures = memoizeTransformer(1000, function(str) {
+    this._doColorize = memoize(this.colorize);
+    this._findAllMatchingBracketsIgnoreMismatches = memoize((str) => matchingBrackets(str, true));
+    this._findAllMatchingBracketsIncludeMismatches = memoize((str) => matchingBrackets(str, false));
+    this._stripCompleteJSStructures = memoize((str) => {
       // Remove substructures of the JS input string `str` in order to simplify it,
       // by removing matching pairs of quotes and parentheses/brackets.
       // Specifically, remove all but the last, non-nested pair of (), because ()
@@ -162,7 +148,7 @@ class REPLServer extends REPL.REPLServer {
     // back to the common prefix of the two. Do that by counting all the
     // non-escape-sequence characters in what comes after the common prefix
     // in `before`.
-    const backtrackLength = characterCount(stripAnsi(before.slice(commonPrefixLength)));
+    const backtrackLength = characterCount(this.ansi.strip(before.slice(commonPrefixLength)));
     // Put it all together: Backtrack from `before` to the common prefix, apply
     // all the escape sequences that were present before, and then apply the
     // new output from `after`.

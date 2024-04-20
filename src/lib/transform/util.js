@@ -2,13 +2,13 @@ import { createRequire, isBuiltin } from 'node:module';
 import { transform } from '@esbuild-kit/core-utils';
 
 // https://github.com/esbuild-kit/tsx/blob/develop/src/patch-repl.ts
-/** @type {Parameters<typeof transform>[2]} */
-const tsconfig = {
+/** @type {Parameters<transform>[2]} */
+const esconfig = {
   minify: false,
   loader: 'tsx',
   format: 'esm',
   platform: 'node',
-  target: 'node16',
+  target: 'node20',
   jsx: 'automatic',
   define: { require: 'global.require' },
   tsconfigRaw: { compilerOptions: { preserveValueImports: true } },
@@ -16,10 +16,11 @@ const tsconfig = {
 
 /**
  * @param {string} code
- * @param {string} file
+ * @param {string} sourcefile
  */
-export const esbuild = async (code, file) => {
-  ({ code } = await transform(code, file, tsconfig).catch(() => ({ code })));
+export const esbuild = async (code, sourcefile) => {
+  const args = [code, sourcefile, { ...esconfig, sourcefile }];
+  ({ code } = await transform(...args).catch(() => ({ code })));
   return code;
 };
 

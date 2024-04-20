@@ -1,17 +1,14 @@
-#!/usr/bin/env -S node --experimental-network-imports --no-warnings
+#!/usr/bin/env -S node --no-warnings --experimental-network-imports
 
 import { start } from './index.js';
+import { blue } from './lib/ansi.js';
+import { normalize } from 'node:path';
 
 start({
   breakEvalOnSigint: true,
   commands: {
     exit: ({ repl }) => (repl.close(), process.exit()),
     clear: ({ repl }) => repl.write(null, { ctrl: true, name: 'l' }),
-    pwd({ repl }) {
-      repl.clearBufferedCommand();
-      $log`{blue.underline ${$path.normalize(process.cwd())}}`;
-      repl.displayPrompt(true);
-    },
     ls({ argv }) {
       const flags = ['-A ', '--color=auto', '--classify=auto', '--group-directories-first'];
       $`ls ${[...flags, ...argv]}`;
@@ -19,8 +16,8 @@ start({
     cd({ repl, args }) {
       try {
         repl.clearBufferedCommand();
-        process.chdir($path.normalize(args));
-        $log`{blue.underline ${$path.normalize(process.cwd())}}`;
+        process.chdir(normalize(args));
+        console.log(blue.underline(normalize(process.cwd())));
       } catch (_) {
         repl.setErrorPrompt();
       } finally {

@@ -1,46 +1,35 @@
+import { ansi } from '../ansi.js';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { createEmphasize } from 'emphasize';
 import { parse } from '@adobe/css-tools';
-import { Chalk } from 'chalk';
-import { makeTaggedTemplate } from 'chalk-template';
-import { emphasize } from 'emphasize/lib/core.js';
-import xml from 'highlight.js/lib/languages/xml';
-import typescript from 'highlight.js/lib/languages/typescript';
 import { defaultSheet, supportedProps, themes } from './config.js';
-import { extend } from '../util.js';
+import { asArray, entries, foreach, reduce } from '../util.js';
+import typescript from 'highlight.js/lib/languages/typescript';
+import xml from 'highlight.js/lib/languages/xml';
 
 /** @param {import('repl').ReplOptions} */
-export const initHighlighter = ({ output, theme, sheet: config }) => {
-  const chalk = new Chalk(output?.isTTY ? { level: 3 } : {});
-  const chalkTemplate = makeTaggedTemplate(chalk);
-  emphasize.registerLanguage('typescript', typescript);
-  emphasize.registerLanguage('xml', xml); // needed for jsx support for some reason
-  const sheet = initSheet(chalk, { ...defaultSheet, ...parseTheme(theme, config) });
+export const initHighlighter = ({ theme, sheet: config }) => {
+  const emphasize = createEmphasize();
+  emphasize.register('typescript', typescript);
+  emphasize.register('xml', xml); // needed for jsx support for some reason
+  const sheet = initSheet(ansi, { ...defaultSheet, ...parseTheme(theme, config) });
   const colorize = (code) => emphasize.highlight('tsx', code, sheet).value;
-  extend(global, {
-    $log: extend((...args) => console.log(chalkTemplate(...args)), {
-      highlight: (code) => console.log(colorize(code)),
-    }),
-  });
-
-  return { colorize, chalk };
+  return { ansi, colorize };
 };
 
 /**
- * @param {import('chalk').ChalkInstance} chalk
+ * @param {Record<string, any>} chalk
  * @param {import('repl').ReplOptions['sheet']}
  * @returns {import('emphasize').Sheet}
  */
 const initSheet = (chalk, { default: [fallback] = [], ...rest }) => {
   const instance = fallback?.startsWith('#') ? chalk.hex(fallback) : chalk;
-  return Object.entries(rest).reduce((sheet, [prop, values]) => {
-    sheet[prop] = (Array.isArray(values) ? values : [values]).reduce(
-      (acc, style) => (style.startsWith?.('#') ? acc.hex(style) : acc[style] || acc),
-      instance
-    );
-
-    return sheet;
-  }, {});
+  return reduce(entries(rest), {}, (sheet, [prop, values]) => {
+    sheet[prop] = reduce(asArray(values), instance, (acc, style) => (
+      style.startsWith?.('#') ? acc.hex(style) : acc[style]
+    ));
+  });
 };
 
 /**
@@ -53,23 +42,20 @@ const parseTheme = (theme, config = {}) => {
   const { resolve } = createRequire(import.meta.url);
   const css = readFileSync(resolve(`highlight.js/styles/${theme}.css`), 'utf-8');
   const { rules } = parse(css)?.stylesheet ?? {};
-  return rules?.reduce((acc, { selectors, declarations }) => {
-    if (!selectors || !declarations) return acc;
-    const values = declarations.reduce((cur, { property, value }) => {
-      if (supportedProps.includes(property)) {
-        property === 'font-weight' && +value > 400 && (value = 'bold');
-        cur.push(value);
-      }
+  return reduce(rules, config, (acc, { selectors, declarations }) => {
+    if (!selectors || !declarations) return;
 
-      return cur;
-    }, []);
+    const values = reduce(declarations, [], (cur, { property, value }) => {
+      if (property in config) return;
+      if (!supportedProps.includes(property)) return;
+      property === 'font-weight' && (value = +value > 400 ? 'bold' : 'dim');
+      cur.push(value);
+    });
 
-    (values.length ? selectors : []).forEach((selector) => {
+    foreach(values.length ? selectors : [], (selector) => {
       const cur = selector.replace(/[.]hljs-?/g, '') || 'default';
       Array.isArray(acc[cur]) || (acc[cur] = typeof acc[cur] === 'string' ? [acc[cur]] : []);
       acc[cur].push(...values);
     });
-
-    return acc;
-  }, config);
+  });
 };

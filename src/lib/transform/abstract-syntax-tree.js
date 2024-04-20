@@ -31,11 +31,11 @@ export const initImportDeclaration = ({ name, id, cdn = true }) => {
   const value = properties[0]?.key?.name;
   const declarator = { type: 'VariableDeclarator', id: { type: 'ObjectPattern', properties } };
   const ret = { kind: 'var', type: 'VariableDeclaration', declarations: [declarator] };
-  const localImport = !isUnresolvableImport(name, cdn);
-  const source = localImport ? name : `https://cdn.jsdelivr.net/npm/${name}/+esm`;
+  const remote = isUnresolvableImport(name, cdn);
+  const source = remote ? `https://cdn.jsdelivr.net/npm/${name}/+esm` : name;
 
   // already resolved from previous network import
-  if (!localImport && source in global) {
+  if (remote && source in global) {
     declarator.init = {
       type: 'CallExpression',
       callee: { type: 'Identifier', name: '$resolve_global_module' },
