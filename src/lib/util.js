@@ -1,25 +1,29 @@
 import os from 'node:os';
 import { $ } from 'execa';
-import { dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import findCacheDir from 'find-cache-dir';
-import { execOptions } from './config.js';
 import { green } from './ansi.js';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import { execaOptions } from './config.js';
+import findCacheDir from 'find-cache-dir';
 
+const { isArray } = Array;
 const { keys, defineProperty } = Object;
 
-export const asArray = (x) => Array.isArray(x) ? x : x == null ? [] : [x];
+/**
+ * @template {object} T
+ * @template {Record<string, any>} Props
+ * @param {T} target
+ * @param {Readonly<Props>} props
+ * @returns {T & Props}
+ */
+export const define = (target, props) => {
+  props || ([target, props] = [{}, target]);
+  for (const key of keys(props)) {
+    const value = props[key];
+    defineProperty(target, key, { value });
+  }
 
-export const reduce = (...args) => {
-  if (args.length < 3) return (res) => reduce(res, ...args);
-  const [arr, init = {}, resolve] = args;
-  return arr.reduce((acc, x, i) => resolve(acc, x, i) ?? acc, init) ?? init;
-};
-
-export const foreach = (arr, callback) => {
-  if (!arr) return [];
-  const len = arr.length;
-  for (let i = 0; i < len; ++i) callback(arr[i], i);
+  return target;
 };
 
 export const entries = (obj) => {
@@ -30,45 +34,45 @@ export const entries = (obj) => {
   return ret;
 };
 
-/**
- * @template {object} T
- * @template {Record<string, any>} Props
- * @param {T} target
- * @param {Readonly<Props>} props
- * @returns {T & Props}
- */
-export const define = (target, props) => {
-  props ?? ([target, props] = [{}, target]);
-  for (const key of keys(props)) {
-    const value = props[key];
-    defineProperty(target, key, { value });
-  }
+export const asArray = (x) => isArray(x) ? x : x == null ? [] : [x];
 
-  return target;
+export const foreach = (arr, callback) => {
+  if (!arr) return [];
+  const len = arr.length;
+  for (let i = 0; i < len; ++i) callback(arr[i], i);
+};
+
+export const reduce = (...args) => {
+  if (args.length < 3) return (res) => reduce(res, ...args);
+  const [arr, init = {}, resolve] = args;
+  return arr.reduce((acc, x, i) => resolve(acc, x, i) ?? acc, init) ?? init;
 };
 
 /** @param {import('repl').REPLServer} repl */
-export const withHistory = (repl) => {
+export const initExeca = (repl, shell = 'bash') => {
+  const execa = $({ ...execaOptions, shell });
+  const displayPromptOnClose = (code) => {
+    code && repl.setErrorPrompt();
+    repl.displayPrompt(true);
+  };
+
+  return async (...args) => {
+    const proc = execa(...args);
+    proc.on('spawn', repl.clearBufferedCommand);
+    proc.on('close', displayPromptOnClose);
+    return proc;
+  };
+};
+
+/** @param {import('repl').REPLServer} repl */
+export const initHistory = (repl) => {
   try {
     const cwd = dirname(fileURLToPath(import.meta.url));
     const dir = findCacheDir({ cwd, name: 'rtepl', create: true });
-    dir && repl.setupHistory(`${dir}/.node_repl_history`, () => {});
+    dir && repl.setupHistory(join(dir, '.node_repl_history'), () => {});
   } catch (_) {}
 
   return repl;
-};
-
-/** @param {import('repl').REPLServer} repl */
-export const replExec = (repl) => {
-  const exec = $(execOptions);
-  return async (...args) => {
-    const cmd = exec(...args);
-    cmd.on('spawn', () => repl.clearBufferedCommand());
-    cmd.on('close', () => repl.displayPrompt(true));
-    const ret = await cmd;
-    ret.exitCode && repl.setErrorPrompt();
-    return ret;
-  };
 };
 
 export const displayEnvironmentInfo = () => {
@@ -83,4 +87,10 @@ export const displayEnvironmentInfo = () => {
   ${osInfo} ${os.machine()}
   ${os.cpus().pop().model}
   `);
+};
+
+export const resolve_global_module = (key, defaultImport, namedImport) => {
+  const mod = global[key];
+  defaultImport && (global[defaultImport] = mod.default ?? mod);
+  return namedImport in mod ? mod : mod.default;
 };

@@ -11,21 +11,18 @@ class REPLServer extends REPL.REPLServer {
   /** @param {import('node:repl').ReplOptions} options */
   constructor(options = {}) {
     const { ansi, colorize } = initHighlighter(options);
-    const promptChar = options.prompt || '> ';
-    const $prompt = { default: ansi.green(promptChar), error: ansi.red(promptChar) };
-    options.prompt = $prompt.default;
-    super(options);
+    const $prompt = {
+      error: ansi.red('> '),
+      default: options.prompt = ansi.green('> '),
+    };
 
-    /** @type {keyof $prompt} */
+    super(options);
     this.ansi = ansi;
     this.state = 'default';
     this.$prompt = $prompt;
-    this.colorize = colorize;
-    this.underline = ansi.underline;
-    this.highlightBracketPosition = -1;
     this.lineBeforeInsert = undefined;
-
-    this._doColorize = memoize(this.colorize);
+    this.highlightBracketPosition = -1;
+    this._colorize = memoize(colorize);
     this._findAllMatchingBracketsIgnoreMismatches = memoize((str) => matchingBrackets(str, true));
     this._findAllMatchingBracketsIncludeMismatches = memoize((str) => matchingBrackets(str, false));
     this._stripCompleteJSStructures = memoize((str) => {
@@ -80,20 +77,22 @@ class REPLServer extends REPL.REPLServer {
 
   // When refreshinng the whole line, find matching brackets and keep the position
   // of the matching one in mind (if there is any).
-  // prettier-ignore
   _refreshLine() {
     try {
-      this.underline && BRACKETS.includes(this.line[this.cursor]) &&
-      (this.highlightBracketPosition = this._findMatchingBracket(this.line, this.cursor));
+      if (BRACKETS.includes(this.line[this.cursor])) {
+        this.highlightBracketPosition = this._findMatchingBracket(this.line, this.cursor);
+      }
       return super._refreshLine();
-    } finally { this.highlightBracketPosition = -1; }
+    } finally {
+      this.highlightBracketPosition = -1;
+    }
   }
 
   _writeToOutput(stringToWrite) {
     // Skip false-y values, and if we print only whitespace or have
     // not yet been fully initialized, just write to output directly.
     if (!stringToWrite) return;
-    if (stringToWrite.match(/^\s+$/) || !this.colorize) {
+    if (!this._colorize || stringToWrite.match(/^\s+$/)) {
       this.output.write(stringToWrite);
       return;
     }
@@ -118,12 +117,12 @@ class REPLServer extends REPL.REPLServer {
     // because this typically runs once for each character that is entered.
     const simplified = this._stripCompleteJSStructures(this.lineBeforeInsert);
     // Colorize the 'before' state.
-    const before = this._doColorize(simplified);
+    const before = this._colorize(simplified);
     // Colorize the 'after' state, using the same simplification (this works because
     // `lineBeforeInsert + stringToWrite === line` implies that
     // `simplified       + stringToWrite` is a valid simplification of `line`,
     // and the former is a precondition for this method to be called).
-    const after = this._doColorize(simplified + stringToWrite);
+    const after = this._colorize(simplified + stringToWrite);
     // Find the first character or escape sequence that differs in `before` and `after`.
     const commonPrefixLength = computeCommonPrefixLength(before, after);
     // Gather all escape sequences that occur in the *common* part of the string.
@@ -169,7 +168,7 @@ class REPLServer extends REPL.REPLServer {
       // highlighting using BOM characters (because it seems safe to assume
       // that they are ignored by highlighting) so that we can remember where
       // the bracket was.
-      stringToWrite = this._doColorize(
+      stringToWrite = this._colorize(
         `${stringToWrite.substring(0, this.highlightBracketPosition)}\ufeff${
           stringToWrite[this.highlightBracketPosition]
         }\ufeff${stringToWrite.substring(this.highlightBracketPosition + 1)}`
@@ -178,9 +177,9 @@ class REPLServer extends REPL.REPLServer {
       // Then remove the BOM characters again and colorize the bracket in between.
       stringToWrite = stringToWrite.replace(
         /\ufeff(.+)\ufeff/,
-        (_, bracket) => this.underline(bracket)
+        (_, bracket) => this.ansi.underline(bracket)
       );
-    } else stringToWrite = this._doColorize(stringToWrite);
+    } else stringToWrite = this._colorize(stringToWrite);
 
     this.output.write(`${this._prompt}${stringToWrite}`);
   }
@@ -205,4 +204,8 @@ class REPLServer extends REPL.REPLServer {
 }
 
 export const defaultREPL = REPL;
-export default { REPLServer, start: (options) => new REPLServer(options) };
+
+export default {
+  REPLServer,
+  start: (options) => new REPLServer(options),
+};

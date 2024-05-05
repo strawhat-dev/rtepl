@@ -1,9 +1,5 @@
-import { parse } from 'meriyah';
-import { generate } from 'astring';
-import { esbuild, shouldSkipParsing } from './util.js';
+import { esbuild, generate, parse, shouldSkipParsing } from './util.js';
 import { initImportDeclaration, initProp } from './abstract-syntax-tree.js';
-
-const { assign } = Object;
 
 /** @type {import('meriyah').Options} */
 const parserOptions = {
@@ -42,7 +38,7 @@ const statementDispatch = /** @type {const} */ ({
     if (!(type === 'TaggedTemplateExpression' && tag?.name === '$')) return statement;
     const argument = { type: 'AwaitExpression', argument: statement.expression };
     const expression = { type: 'UnaryExpression', operator: 'void', prefix: true, argument };
-    return assign(statement, { expression });
+    return Object.assign(statement, { expression });
   },
   /** @param {import('meriyah').ESTree.VariableDeclaration} declaration */
   VariableDeclaration(declaration, { cdn, redeclarations }) {

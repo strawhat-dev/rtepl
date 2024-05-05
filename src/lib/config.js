@@ -1,9 +1,11 @@
 /** @type {import('repl').ReplOptions} */
 export const defaultConfig = {
+  theme: 'atom-one-dark',
+  shell: 'bash',
   preview: false,
   useGlobal: true,
   ignoreUndefined: true,
-  theme: 'atom-one-dark',
+  breakEvalOnSigint: true,
   extensions: {
     cdn: true,
     typescript: true,
@@ -13,10 +15,11 @@ export const defaultConfig = {
 };
 
 /** @type {import('execa').Options<'utf8'>} */
-export const execOptions = {
+export const execaOptions = {
   stdio: 'inherit',
-  shell: 'bash',
   reject: false,
+  cleanup: true,
+  extendEnv: true,
   preferLocal: false,
   windowsHide: false,
 };

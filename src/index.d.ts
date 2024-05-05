@@ -1,21 +1,17 @@
 import type repl from 'node:repl';
-import type { ExecaReturnValue, TemplateExpression } from 'execa';
-
-declare global {
-  /** Currently active repl instance. */
-  var $repl: repl.REPLServer;
-
-  /** Wrapped execa executor for active repl instance. */
-  var $: (t: TemplateStringsArray, ...subs: TemplateExpression[]) => Promise<ExecaReturnValue>;
-}
+import type { ExecaReturnValue, Options as ExecOptions, TemplateExpression } from 'execa';
 
 type REPL = typeof repl;
 declare const rtepl: REPL;
 declare module 'repl' {
   interface ReplOptions extends repl.ReplOptions {
     /**
+     * Shell to use when running commands with `$` *(wrapped `execa` instance)* in the repl.
+     * @defaultValue `'bash'`
+     */
+    shell?: boolean | string;
+    /**
      * The name of the theme to use (provided by `hljs` stylesheets).
-     *
      * @defaultValue `'atom-one-dark'`
      * @see {@link https://github.com/highlightjs/highlight.js/tree/main/src/styles}
      */
@@ -23,16 +19,14 @@ declare module 'repl' {
     /**
      * A configuration object that maps `hljs` classes to a single or array of `chalk`
      * color/modifier names _(or hex values)_, used for more advanced customization of syntax styling.
-     *
      * - Can be used in conjunction with the `theme` option, which will be merged.
      */
     sheet?: SheetConfig;
     /**
      * Define commands to be handled with a custom callback instead of the repl server when a
      * matching command name is given.
-     *
-     * - Note: Differs from commands defined by the native `repl.defineCommand`, in that the `'.'`
-     *   prefix is not needed.
+     * - When `'*'` is specified as a property, anything can be intercepted by the defined callback.
+     * - Note: Differs from node's `repl.defineCommand` in that the `'.'` prefix is not needed.
      *
      * @example
      *   repl.start({
@@ -41,19 +35,30 @@ declare module 'repl' {
      *     },
      *   });
      */
-    commands?: { [command: string]: (cmd: CommandEvent) => void };
+    commands?: {
+      [k in '*' | (string & {})]?: (cmd: {
+        /** The full command-line string. */
+        command: string;
+        /** Parsed arguments passed to the command as a string. */
+        args: string;
+        /** Parsed arguments passed to the command as an array. */
+        argv: string[];
+        /** The default `repl.eval` callback (default arguments passed if none were given). */
+        next: repl.REPLEval;
+        /** The current repl instance. */
+        repl: repl.REPLServer;
+      }, _: EvalArgs) => void;
+    };
     /**
      * Extensions that affect transpilation process. Commands that would normally be invalid in the
      * repl context may be transpiled to compatible code, allowing for quick prototyping and
      * flexibility while testing snippets.
-     *
-     * @defaultValue All options are `true` by default, *unless `extensions` is explicitly given and overridden by the user*.
+     * @defaultValue All options are `true` by default, *unless `extensions` is explicitly given and defined*.
      */
     extensions?: {
       /**
        * Automatically use a cdn (jsdelivr) for all imports when the imported module is not a node
        * built-in, or the module cannot be resolved from the current working directory.
-       *
        * - Note: `--experimental-network-imports` flag must be enabled
        */
       cdn?: boolean;
@@ -66,7 +71,6 @@ declare module 'repl' {
       staticImports?: boolean;
       /**
        * Enable transpiling typescript with esbuild.
-       *
        * - Note: Unlike `ts-node`'s repl, this does **not** perform any typechecking (similarly to `tsx`).
        */
       typescript?: boolean;
@@ -75,17 +79,20 @@ declare module 'repl' {
 }
 
 export default rtepl;
+export type * from 'node:repl';
 export declare const start: REPL['start'];
 export declare const writer: REPL['writer'];
 export declare const REPLServer: REPL['REPLServer'];
 export declare const REPL_MODE_SLOPPY: REPL['REPL_MODE_SLOPPY'];
 export declare const REPL_MODE_STRICT: REPL['REPL_MODE_STRICT'];
 
-// exported type definitions
-export type * from 'node:repl';
+/** @internal The rest of the arguments that were passed to `repl.eval` before the command was intercepted. */
+export type REPLEvalParams = Parameters<repl.REPLEval> extends [any, ...infer rest] ? rest : never;
+
 export type Style = import('ansis').AnsiColors | import('ansis').AnsiStyles | `#${string}`;
+
 export type SheetConfig = {
-  [className?: string]: Style | Style[];
+  [classname: string]: Style | Style[] | undefined;
 
   /** Fallback value */
   default?: Style | Style[];
@@ -247,8 +254,8 @@ export type SheetConfig = {
   deletion?: Style | Style[];
 };
 
-// https://github.com/highlightjs/highlight.js/tree/main/src/styles
-type Theme =
+/** {@link https://github.com/highlightjs/highlight.js/tree/main/src/styles} */
+export type Theme =
   | 'a11y-dark'
   | 'a11y-light'
   | 'agate'
@@ -497,16 +504,3 @@ type Theme =
   | 'base16/woodland'
   | 'base16/xcode-dusk'
   | 'base16/zenburn';
-
-type CommandEvent = {
-  /** The current repl instance. */
-  repl: repl.REPLServer;
-  /** The full command string. */
-  command: string;
-  /** The args string (contains everything after the command name itself). */
-  args: string;
-  /** An array of parsed arguments passed to the command. */
-  argv: string[];
-  /** @internal The rest of the arguments that were passed to `repl.eval` before the command was intercepted. */
-  _: Parameters<repl.REPLEval> extends [_, ...infer rest] ? rest : never;
-};

@@ -38,7 +38,7 @@ export const initImportDeclaration = ({ name, id, cdn = true }) => {
   if (remote && source in global) {
     declarator.init = {
       type: 'CallExpression',
-      callee: { type: 'Identifier', name: '$resolve_global_module' },
+      callee: { type: 'Identifier', name: 'resolve_global_module' },
       arguments: [
         { type: 'Literal', value: source },
         { type: 'Literal', value: id.name },

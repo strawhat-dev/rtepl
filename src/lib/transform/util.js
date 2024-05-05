@@ -1,18 +1,13 @@
-import { createRequire, isBuiltin } from 'node:module';
+import memoize from 'memoize-one';
 import { transform } from '@esbuild-kit/core-utils';
+import { createRequire, isBuiltin } from 'node:module';
+import { join } from 'node:path';
 
-// https://github.com/esbuild-kit/tsx/blob/develop/src/patch-repl.ts
-/** @type {Parameters<transform>[2]} */
-const esconfig = {
-  minify: false,
-  loader: 'tsx',
-  format: 'esm',
-  platform: 'node',
-  target: 'node20',
-  jsx: 'automatic',
-  define: { require: 'global.require' },
-  tsconfigRaw: { compilerOptions: { preserveValueImports: true } },
-};
+/** @type {import('meriyah')['parse']} */
+export const parse = await import('meriyah').then((meriyah) => memoize(meriyah.parse));
+
+/** @type {import('astring')['generate']} */
+export const generate = await import('astring').then((astring) => memoize(astring.generate));
 
 /**
  * @param {string} code
@@ -35,22 +30,37 @@ export const shouldSkipParsing = (code, opts) => (
 
 /**
  * @param {string} name
- * @param {boolean} cdn
+ * @param {boolean} enabled
  */
-export const isUnresolvableImport = (name, cdn) => {
+export const isUnresolvableImport = (name, enabled) => {
   if (
-    !cdn || // option disabled by user
-    isBuiltin(name) || // node.js built-ins
-    name.startsWith('.') || // relative-imports
+    !enabled || // option disabled by user
+    isBuiltin(name) || // node.js builtins
+    name.startsWith('./') || // relative-imports
     name.startsWith('https:') // network-imports
   ) {
     return false;
   }
 
   try {
-    const require = createRequire(`${process.cwd()}/index.js`);
+    const require = createRequire(join(process.cwd(), 'index.js'));
     if (require.resolve(name)) return false;
   } catch (_) {}
 
   return true;
+};
+
+/**
+ * {@link https://github.com/privatenumber/tsx/blob/master/src/repl.ts}
+ * @type {Parameters<transform>[2]}
+ */
+const esconfig = {
+  minify: false,
+  loader: 'tsx',
+  format: 'esm',
+  platform: 'node',
+  target: 'node20',
+  jsx: 'automatic',
+  define: { require: 'global.require' },
+  tsconfigRaw: { compilerOptions: { preserveValueImports: true } },
 };

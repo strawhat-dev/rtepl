@@ -1,11 +1,10 @@
-#!/usr/bin/env -S node --no-warnings --experimental-network-imports
+#!/usr/bin/env -S node --no-warnings --experimental-detect-module --experimental-network-imports
 
-import { start } from './index.js';
-import { blue } from './lib/ansi.js';
 import { normalize } from 'node:path';
+import { blue } from './lib/ansi.js';
+import { start } from './index.js';
 
 start({
-  breakEvalOnSigint: true,
   commands: {
     exit: ({ repl }) => (repl.close(), process.exit()),
     clear: ({ repl }) => repl.write(null, { ctrl: true, name: 'l' }),

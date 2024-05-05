@@ -17,13 +17,13 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "start": "node --no-warnings --experimental-network-imports ./src/cli.js"
+    "start": "node --no-warnings --experimental-detect-module --experimental-network-imports ./src/cli.js"
   },
   "dependencies": {
     "@adobe/css-tools": "^4.3.3",
     "@esbuild-kit/core-utils": "^3.3.2",
     "ansi-regex": "^6.0.1",
-    "ansis": "^3.1.1",
+    "ansis": "^3.2.0",
     "astring": "^1.8.6",
     "emphasize": "^7.0.0",
     "execa": "^8.0.1",
@@ -36,8 +36,8 @@
   },
   "devDependencies": {
     "@types/eslint": "^8.56.10",
-    "@types/node": "^20.12.7",
+    "@types/node": "^20.12.8",
     "@types/yargs-parser": "^21.0.3",
-    "eslint": "^9.1.0"
+    "eslint": "^9.2.0"
   }
 }

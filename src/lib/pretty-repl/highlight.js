@@ -1,12 +1,12 @@
-import { ansi } from '../ansi.js';
-import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { createEmphasize } from 'emphasize';
+import { readFileSync } from 'node:fs';
 import { parse } from '@adobe/css-tools';
+import { createEmphasize } from 'emphasize';
+import xml from 'highlight.js/lib/languages/xml';
+import typescript from 'highlight.js/lib/languages/typescript';
 import { defaultSheet, supportedProps, themes } from './config.js';
 import { asArray, entries, foreach, reduce } from '../util.js';
-import typescript from 'highlight.js/lib/languages/typescript';
-import xml from 'highlight.js/lib/languages/xml';
+import { ansi } from '../ansi.js';
 
 /** @param {import('repl').ReplOptions} */
 export const initHighlighter = ({ theme, sheet: config }) => {
@@ -27,7 +27,11 @@ const initSheet = (chalk, { default: [fallback] = [], ...rest }) => {
   const instance = fallback?.startsWith('#') ? chalk.hex(fallback) : chalk;
   return reduce(entries(rest), {}, (sheet, [prop, values]) => {
     sheet[prop] = reduce(asArray(values), instance, (acc, style) => (
-      style.startsWith?.('#') ? acc.hex(style) : acc[style]
+      style.startsWith?.('#') ?
+        acc.hex(style) :
+        style.startsWith?.('rgb') ?
+        acc.rgb(...(style.match(/\b\d+\b/g) || [])) :
+        acc[style]
     ));
   });
 };
