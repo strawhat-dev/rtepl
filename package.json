@@ -26,7 +26,7 @@
     "ansis": "^3.2.0",
     "astring": "^1.8.6",
     "emphasize": "^7.0.0",
-    "execa": "^8.0.1",
+    "execa": "^9.0.2",
     "find-cache-dir": "^5.0.0",
     "highlight.js": "^11.9.0",
     "memoize-one": "^6.0.0",
@@ -36,7 +36,7 @@
   },
   "devDependencies": {
     "@types/eslint": "^8.56.10",
-    "@types/node": "^20.12.8",
+    "@types/node": "^20.12.11",
     "@types/yargs-parser": "^21.0.3",
     "eslint": "^9.2.0"
   }
