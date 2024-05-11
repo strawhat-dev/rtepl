@@ -85,7 +85,7 @@ export declare const writer: REPL['writer'];
 export declare const REPLServer: REPL['REPLServer'];
 export declare const REPL_MODE_SLOPPY: REPL['REPL_MODE_SLOPPY'];
 export declare const REPL_MODE_STRICT: REPL['REPL_MODE_STRICT'];
-export declare const displayEnvironmentInfo: typeof import('./lib/util.js').displayEnvironmentInfo;
+export declare const displayEnvironmentInfo: () => void;
 
 /** @internal The rest of the arguments that were passed to `repl.eval` before the command was intercepted. */
 export type REPLEvalParams = Parameters<repl.REPLEval> extends [any, ...infer rest] ? rest : never;
