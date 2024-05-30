@@ -6,6 +6,18 @@ import { define, initExeca, props, setupREPL, sorted } from './util.js';
 import { defaultConfig, parserOptions } from './config.js';
 import { ansi } from './ansi.js';
 
+const { assign, defineProperties } = Object;
+
+const displayEnvironmentInfo = () => {
+  const platform = process.platform;
+  const osInfo = platform === 'darwin' ? `${platform} v${os.release()}` : os.version();
+  console.log(ansi.green`
+  node ${process.version}
+  ${osInfo} ${os.machine()}
+  ${os.cpus().pop().model}
+  `);
+};
+
 export const initREPL = (init = {}) => {
   const instance = prettyREPL;
   const start = instance.start.bind(instance);
@@ -20,7 +32,12 @@ export const initREPL = (init = {}) => {
       const defaultEval = repl.eval.bind(repl);
       const $ = initExeca(repl, shell);
       return define(repl, {
-        context: define(repl.context, { $, ansi, props, sorted }),
+        context: defineProperties(
+          // repl context globals / utils
+          define(repl.context, { $, ansi, props, sorted }),
+          // skip assignment to "_" warning message.
+          { _: { get: () => this._, set: (_) => assign(this, { _ }) } }
+        ),
         async eval(command, ...rest) {
           const next = async (...args) => {
             args.length || (args = await transpileREPL([command, ...rest], extensions));
@@ -37,16 +54,6 @@ export const initREPL = (init = {}) => {
       });
     },
   });
-};
-
-export const displayEnvironmentInfo = () => {
-  const platform = process.platform;
-  const osInfo = platform === 'darwin' ? `${platform} v${os.release()}` : os.version();
-  console.log(ansi.green`
-  node ${process.version}
-  ${osInfo} ${os.machine()}
-  ${os.cpus().pop().model}
-  `);
 };
 
 /**

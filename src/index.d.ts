@@ -1,5 +1,6 @@
 import type * as repl from 'node:repl';
 import type * as rtepl from './lib/index.js';
+import type { DefaultCommands } from './lib/config.js';
 import type { AnsiColors, Ansis, AnsiStyles } from 'ansis';
 import type { ExecaReturnValue, Options as ExecOptions, Result } from 'execa';
 
@@ -32,11 +33,9 @@ declare module 'repl' {
      * - Note: Differs from node's `repl.defineCommand` in that the `'.'` prefix is not needed.
      *
      * @example
-     *   repl.start({
-     *     commands: {
-     *       clear: ({ repl }) => repl.write(null, { ctrl: true, name: 'l' }),
-     *     },
-     *   });
+     * repl.start({ commands: {
+     *   ls: ({ $, argv }) => $`ls ${[...argv]}`,
+     * }});
      */
     commands?: {
       [k in '*' | (string & {})]?: (cmd: {
@@ -92,7 +91,14 @@ export declare const REPL_MODE_SLOPPY: REPL['REPL_MODE_SLOPPY'];
 export declare const REPL_MODE_STRICT: REPL['REPL_MODE_STRICT'];
 export default { start, writer, REPLServer, REPL_MODE_SLOPPY, REPL_MODE_STRICT };
 
-export declare const displayEnvironmentInfo: () => void;
+/**
+ * Useful pre-defined custom commands.
+ * @see {@link DefaultCommands}
+ */
+export declare const commands: ReadonlyRecord<
+  '?' | 'cat' | 'cd' | 'clear' | 'exit' | 'ls' | 'which',
+  VoidFn
+>;
 
 export type * from 'node:repl';
 
@@ -523,3 +529,5 @@ export type Theme =
 type IsEqual<A, B> = (<G>() => G extends A ? 1 : 2) extends (<G>() => G extends B ? 1 : 2) ? true : false;
 type Filter<A, B> = IsEqual<A, B> extends true ? never : (A extends B ? never : A);
 type Except<T, K extends keyof T> = { [k in keyof T as Filter<k, K>]: T[k] };
+type ReadonlyRecord<K, V> = { readonly [key in K]: V } & {};
+type VoidFn = (...args: any[]) => void;

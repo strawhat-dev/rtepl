@@ -28,25 +28,23 @@ export class REPLServer extends repl.REPLServer {
     this.promptStatus = 'default';
     this.lineBeforeInsert = undefined;
     this.highlightBracketPosition = -1;
-    define(this, initHighlighter(options));
-    define(this, setupPreview(this));
-
-    defineProperties(this, {
-      context: { enumerable: false },
-      history: { enumerable: false },
-    });
 
     assign(this.writer.options, {
       ...inspectDefaults,
       breakLength: Math.floor(termsize().columns * 0.90),
     });
 
+    defineProperties(
+      define(setupPreview(this), initHighlighter(options)),
+      { context: { enumerable: false }, history: { enumerable: false } }
+    );
+
     this.setErrorPrompt = () => void assign(this, { promptStatus: 'error' });
     this.setDefaultPrompt = () => void assign(this, { promptStatus: 'default' });
-    this.strlen = memoize((val) => +isDefined(val) && stringWidth(String(val)));
     this.findAllMatchingBracketsIgnoreMismatches = memoize((str) => matchingBrackets(str, true));
     this.findAllMatchingBracketsIncludeMismatches = memoize((str) => matchingBrackets(str, false));
     this.computeCommonPrefixLength = memoize(computeCommonPrefixLength);
+    this.strlen = memoize((str) => stringWidth(String(str)));
 
     this.findMatchingBracket = memoize((line, position) => {
       // Find the matching bracket opposite of the one at position.
@@ -158,12 +156,6 @@ export class REPLServer extends repl.REPLServer {
     return cursorPos.rows === displayPos.rows && cursorPos.cols === displayPos.cols;
   };
 
-  _ttyWriteTitle = (str) => {
-    if (str = ansi.strip(str.trim())) {
-      process.stdout.write(`\x1b]2;${str}\x1b\\`);
-    }
-  };
-
   /** @param {import('node:readline').Key} key */
   _ttyWrite = (data, key) => {
     this.clearPreview(key);
@@ -179,6 +171,12 @@ export class REPLServer extends repl.REPLServer {
 
     key.name === 'tab' || super._ttyWrite(data, key);
     this.showPreview(key);
+  };
+
+  _ttyWriteTitle = (str) => {
+    if (str = ansi.strip(str.trim())) {
+      process.stdout.write(`\x1b]2;${str}\x1b\\`);
+    }
   };
 
   // prettier-ignore

@@ -1,23 +1,24 @@
 import { clearLine, clearScreenDown } from 'node:readline';
-import { sorted, splitIndex } from '../util.js';
+import { define, sorted, splitIndex } from '../util.js';
 import { ansi } from '../ansi.js';
 
 const { getOwnPropertySymbols } = Object;
-const {
-  dim,
-  bold,
-  cyan,
-  cursorTo,
-  cursorMove,
-  cursorSavePosition,
-  cursorRestorePosition,
-} = ansi;
 
 /**
  * {@link https://github.com/nodejs/node/blob/main/lib/internal/repl/utils.js#L143}
  * @param {import('rtepl').REPLServer} repl
  */
 export const setupPreview = (repl) => {
+  const {
+    dim,
+    bold,
+    cyan,
+    cursorTo,
+    cursorMove,
+    cursorSavePosition,
+    cursorRestorePosition,
+  } = ansi;
+
   let escaped = null;
   let completionPreview = null;
   let previewCompletionCounter = 0;
@@ -103,5 +104,5 @@ export const setupPreview = (repl) => {
     });
   };
 
-  return { clearPreview, showPreview };
+  return define(repl, { showPreview, clearPreview });
 };
