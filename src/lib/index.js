@@ -1,46 +1,56 @@
+import os from 'node:os';
 import parseCommand from 'yargs-parser';
+import prettyREPL from './pretty-repl/index.js';
 import { transpileREPL } from './transform/index.js';
+import { define, initExeca, props, setupREPL, sorted } from './util.js';
 import { defaultConfig, parserOptions } from './config.js';
-import prettyREPL, { defaultREPL } from './pretty-repl/index.js';
-import {
-  define,
-  displayEnvironmentInfo,
-  initExeca,
-  initHistory,
-  resolve_global_module,
-} from './util.js';
-
-export { displayEnvironmentInfo };
-
-export const REPL = defaultREPL;
+import { ansi } from './ansi.js';
 
 export const initREPL = (init = {}) => {
-  const isTTY = init.terminal ?? (init.output ?? process.stdout)?.isTTY;
-  const instance = isTTY ? prettyREPL : defaultREPL;
+  const instance = prettyREPL;
   const start = instance.start.bind(instance);
-  /** @param {import('repl').ReplOptions} options */
-  instance.start = (options = {}) => {
-    const config = { ...defaultConfig, ...init, ...options };
-    const { shell, commands, extensions, ...server } = config;
-    const repl = (displayEnvironmentInfo(), initHistory(start(server)));
-    repl._domain.on('error', () => (repl.setErrorPrompt(), repl.displayPrompt(true)));
-    const handleREPL = repl.eval.bind(repl);
-    return define(repl, {
-      context: define(repl.context, { $: initExeca(repl, shell), resolve_global_module, repl }),
-      async eval(command, ...rest) {
-        const next = async (...args) => {
-          args.length || (args = await transpileREPL([command, ...rest], extensions));
-          return handleREPL(...args);
-        };
+  return define(instance, {
+    start(options = {}) {
+      const { REPL_INIT_CWD } = process.env;
+      REPL_INIT_CWD && process.chdir(REPL_INIT_CWD);
+      const config = { ...defaultConfig, ...init, ...options };
+      const { commands = {}, shell, extensions, ...server } = config;
+      const repl = (displayEnvironmentInfo(), setupREPL(start(server)));
+      repl._domain.on('error', () => (repl.setErrorPrompt(), repl.displayPrompt(true)));
+      const defaultEval = repl.eval.bind(repl);
+      const $ = initExeca(repl, shell);
+      return define(repl, {
+        context: define(repl.context, { $, ansi, props, sorted }),
+        async eval(command, ...rest) {
+          const next = async (...args) => {
+            args.length || (args = await transpileREPL([command, ...rest], extensions));
+            return defaultEval(...args);
+          };
 
-        repl.setDefaultPrompt();
-        const [key, ...argv] = parseCommand(command, parserOptions)._;
-        const args = command.replace(key, '').trim();
-        const handleCommand = commands?.[key] || commands?.['*'];
-        return handleCommand ? handleCommand({ command, args, argv, repl, next }, rest) : next();
-      },
-    });
-  };
-
-  return instance;
+          repl.setDefaultPrompt();
+          const [key, ...argv] = parseCommand(command, parserOptions)._;
+          const args = command.replace(key, '').trim();
+          const handleCommand = commands[key] || commands['*'];
+          if (typeof handleCommand !== 'function') return next();
+          return handleCommand({ $: $.run, ansi, args, argv, command, next, repl }, rest);
+        },
+      });
+    },
+  });
 };
+
+export const displayEnvironmentInfo = () => {
+  const platform = process.platform;
+  const osInfo = platform === 'darwin' ? `${platform} v${os.release()}` : os.version();
+  console.log(ansi.green`
+  node ${process.version}
+  ${osInfo} ${os.machine()}
+  ${os.cpus().pop().model}
+  `);
+};
+
+/**
+ * @typedef {ReturnType<initExeca>} $
+ * @typedef {prettyREPL['start']} REPLStart
+ * @typedef {import('./pretty-repl/index.js').REPLServer} REPLServer
+ */

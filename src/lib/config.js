@@ -1,27 +1,16 @@
-/** @type {import('repl').ReplOptions} */
+/** @type {import('rtepl').ReplOptions} */
 export const defaultConfig = {
-  theme: 'atom-one-dark',
-  shell: 'bash',
-  preview: false,
   useGlobal: true,
+  useColors: true,
+  historySize: 1000,
   ignoreUndefined: true,
-  breakEvalOnSigint: true,
+  theme: 'atom-one-dark',
   extensions: {
     cdn: true,
     typescript: true,
     staticImports: true,
     redeclarations: true,
   },
-};
-
-/** @type {import('execa').Options<'utf8'>} */
-export const execaOptions = {
-  stdio: 'inherit',
-  reject: false,
-  cleanup: true,
-  extendEnv: true,
-  preferLocal: false,
-  windowsHide: false,
 };
 
 /** @type {import('yargs-parser').Options} */
@@ -31,3 +20,11 @@ export const parserOptions = {
     'unknown-options-as-args': true,
   },
 };
+
+export const execaOptions = /** @type {const} */ ({
+  reject: true,
+  cleanup: true,
+  extendEnv: true,
+  preferLocal: false,
+  windowsHide: false,
+});

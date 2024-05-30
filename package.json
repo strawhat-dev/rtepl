@@ -6,9 +6,7 @@
   "repository": "github:strawhat-dev/rtepl",
   "description": "Read-[transpile]-Eval-Print-Loop w/ syntax highlighting",
   "type": "module",
-  "files": [
-    "src"
-  ],
+  "files": ["src"],
   "module": "./src/index.js",
   "exports": "./src/index.js",
   "types": "./src/index.d.ts",
@@ -17,27 +15,34 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "start": "node --no-warnings --experimental-detect-module --experimental-network-imports ./src/cli.js"
+    "start": "node --no-warnings --experimental-network-imports --experimental-detect-module src/cli.js",
+    "lint": "eslint src"
   },
   "dependencies": {
     "@adobe/css-tools": "^4.3.3",
-    "@esbuild-kit/core-utils": "^3.3.2",
+    "ansi-escapes": "^7.0.0",
     "ansi-regex": "^6.0.1",
     "ansis": "^3.2.0",
     "astring": "^1.8.6",
+    "clipboardy": "^4.0.0",
     "emphasize": "^7.0.0",
-    "execa": "^9.0.2",
+    "esbuild": "^0.21.4",
+    "execa": "^9.1.0",
+    "fast-string-width": "^1.0.5",
     "find-cache-dir": "^5.0.0",
+    "get-cursor-position": "^2.0.0",
     "highlight.js": "^11.9.0",
     "memoize-one": "^6.0.0",
-    "meriyah": "^4.4.2",
-    "untildify": "^5.0.0",
+    "meriyah": "^4.4.3",
+    "terminal-size": "^4.0.0",
+    "which": "^4.0.0",
     "yargs-parser": "^21.1.1"
   },
   "devDependencies": {
-    "@types/eslint": "^8.56.10",
-    "@types/node": "^20.12.11",
+    "@types/node": "^20.12.13",
+    "@types/which": "^3.0.3",
     "@types/yargs-parser": "^21.0.3",
-    "eslint": "^9.2.0"
+    "eslint": "8.57.0",
+    "eslint-define-config": "^2.1.0"
   }
 }

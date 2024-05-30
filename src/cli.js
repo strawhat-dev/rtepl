@@ -1,26 +1,44 @@
-#!/usr/bin/env -S node --no-warnings --experimental-detect-module --experimental-network-imports
+#!/usr/bin/env -S node --no-warnings --experimental-network-imports --experimental-detect-module
 
+import { readFile } from 'node:fs/promises';
 import { normalize } from 'node:path';
-import { blue } from './lib/ansi.js';
 import { start } from './index.js';
+import which from 'which';
+
+const read = async (file) => readFile(normalize(file), { encoding: 'utf-8' });
 
 start({
+  terminal: true,
   commands: {
-    exit: ({ repl }) => (repl.close(), process.exit()),
-    clear: ({ repl }) => repl.write(null, { ctrl: true, name: 'l' }),
-    ls({ argv }) {
-      const flags = ['-A ', '--color=auto', '--classify=auto', '--group-directories-first'];
-      $`ls ${[...flags, ...argv]}`;
+    exit: ({ repl }) => repl.write(null, { ctrl: true, name: 'd' }),
+    clear: ({ repl }) => repl.write('\x1bc', { ctrl: true, name: 'l' }),
+    '?': ({ args, next }, rest) => {
+      const showProps = `$.repl.formatColumns(props(${args}))`;
+      const showType = `ansi.bold.blue(Object.prototype.toString.call(${args}))`;
+      return next(`console.log(${showType}), console.log(${showProps})`, ...rest);
     },
-    cd({ repl, args }) {
+    cat: ({ repl, args }) => {
+      repl.clearBufferedCommand();
+      read(args).then(console.log).catch(repl.setErrorPrompt).finally(repl.resume);
+    },
+    which({ repl, args }) {
+      repl.clearBufferedCommand();
+      which(args).then(console.log).catch(repl.setErrorPrompt).finally(repl.resume);
+    },
+    ls({ $, argv }) {
+      const flags = ['-A', '--group-directories-first', '--file-type', '--color=auto'];
+      const ignore = ['ntuser*', 'NTUSER*', '.DS_Store'].map((pattern) => `--ignore='${pattern}'`);
+      $`ls ${[...flags, ...ignore, ...argv]}`;
+    },
+    cd({ ansi, repl, args }) {
       try {
         repl.clearBufferedCommand();
         process.chdir(normalize(args));
-        console.log(blue.underline(normalize(process.cwd())));
+        console.log(ansi.blue.underline(process.cwd()));
       } catch (_) {
         repl.setErrorPrompt();
       } finally {
-        repl.displayPrompt(true);
+        repl.resume();
       }
     },
   },

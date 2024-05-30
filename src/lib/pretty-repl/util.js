@@ -3,28 +3,15 @@ import ANSIRegex from 'ansi-regex';
 export const ansiRegex = ANSIRegex();
 
 /** Regex that matches ANSI escape sequences only at the beginning of a string. */
-const STARTING_ANSI_RE = new RegExp(`^(${ansiRegex.source})`);
+const ANSI_START_REGEX = new RegExp(`^(${ansiRegex.source})`);
 const BRACKET_PAIRS = ['()', '[]', '{}', '$}'];
 const QUOTE_PAIRS = ["''", '""', '``'];
-
-/**
- * Count the number of Unicode codepoints in a string,
- * i.e. [...str].length without the intermediate Array instance. \
- * {@link https://github.com/mongodb-js/pretty-repl/blob/main/lib/pretty-repl.js#L44}
- */
-export const characterCount = (str) => {
-  let count = 0;
-  for (let i = 0; i < str.length; ++i) {
-    count += str.charCodeAt(i) < 0xd800 || str.charCodeAt(i) >= 0xdc00;
-  }
-
-  return count;
-};
-
 /**
  * Compute the length of the longest common prefix of `before`
  * and `after`, taking ANSI escape sequences into account. \
  * {@link https://github.com/mongodb-js/pretty-repl/blob/main/lib/pretty-repl.js#L22}
+ * @param {string} before
+ * @param {string} after
  * @example
  * computeCommonPrefixLength('abcd', 'abab') === 2
  * computeCommonPrefixLength('ab\x1b[3m', 'ab\x1b[5m') === 2 // (not 4)
@@ -33,7 +20,7 @@ export const computeCommonPrefixLength = (before, after) => {
   let i = 0;
   while (i < Math.min(before.length, after.length) && before[i] === after[i]) {
     // Add length of ANSI escape sequence found in both strings if matching.
-    const match = before.substr(i).match(STARTING_ANSI_RE);
+    const match = before.substr(i).match(ANSI_START_REGEX);
     if (match?.index === 0) {
       if (i !== after.indexOf(match[0], i)) break;
       i += match[0].length;

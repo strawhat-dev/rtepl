@@ -1,130 +1,245 @@
-import REPL from 'node:repl';
-import memoize from 'memoize-one';
+import repl from 'node:repl';
+import termsize from 'terminal-size';
+import stringWidth from 'fast-string-width';
+import getCursorPos from 'get-cursor-position';
+import { inspectDefaults } from './config.js';
+import { define, isDefined, memoize, reduce } from '../util.js';
+import { ansiRegex, computeCommonPrefixLength, matchingBrackets } from './util.js';
 import { initHighlighter } from './highlight.js';
-import { ansiRegex, characterCount, computeCommonPrefixLength, matchingBrackets } from './util.js';
+import { setupPreview } from './preview.js';
+import { ansi } from '../ansi.js';
+
+const { assign, defineProperties } = Object;
 
 // Every open/close pair that should be matched against its counterpart for highlighting.
 const BRACKETS = '()[]{}\'"`$';
 
-// https://github.com/mongodb-js/pretty-repl/blob/master/lib/pretty-repl.js
-class REPLServer extends REPL.REPLServer {
-  /** @param {import('node:repl').ReplOptions} options */
-  constructor(options = {}) {
-    const { ansi, colorize } = initHighlighter(options);
-    const $prompt = {
-      error: ansi.red('> '),
-      default: options.prompt = ansi.green('> '),
-    };
+/** @param {import('rtepl').ReplOptions} options */
+export const start = (options) => new REPLServer(options);
 
-    super(options);
-    this.ansi = ansi;
-    this.state = 'default';
-    this.$prompt = $prompt;
+// https://github.com/mongodb-js/pretty-repl/blob/master/lib/pretty-repl.js
+export class REPLServer extends repl.REPLServer {
+  /** @param {import('rtepl').ReplOptions} options */
+  constructor(options = {}) {
+    super(assign(options, { preview: false }));
+    super.removeHistoryDuplicates = true;
+    super.tabSize = 4;
+    this.promptRow = undefined;
+    this.promptStatus = 'default';
     this.lineBeforeInsert = undefined;
     this.highlightBracketPosition = -1;
-    this._colorize = memoize(colorize);
-    this._findAllMatchingBracketsIgnoreMismatches = memoize((str) => matchingBrackets(str, true));
-    this._findAllMatchingBracketsIncludeMismatches = memoize((str) => matchingBrackets(str, false));
-    this._stripCompleteJSStructures = memoize((str) => {
+    define(this, initHighlighter(options));
+    define(this, setupPreview(this));
+
+    defineProperties(this, {
+      context: { enumerable: false },
+      history: { enumerable: false },
+    });
+
+    assign(this.writer.options, {
+      ...inspectDefaults,
+      breakLength: Math.floor(termsize().columns * 0.90),
+    });
+
+    this.setErrorPrompt = () => void assign(this, { promptStatus: 'error' });
+    this.setDefaultPrompt = () => void assign(this, { promptStatus: 'default' });
+    this.strlen = memoize((val) => +isDefined(val) && stringWidth(String(val)));
+    this.findAllMatchingBracketsIgnoreMismatches = memoize((str) => matchingBrackets(str, true));
+    this.findAllMatchingBracketsIncludeMismatches = memoize((str) => matchingBrackets(str, false));
+    this.computeCommonPrefixLength = memoize(computeCommonPrefixLength);
+
+    this.findMatchingBracket = memoize((line, position) => {
+      // Find the matching bracket opposite of the one at position.
+      const brackets = this.findAllMatchingBracketsIncludeMismatches(line);
+      for (const { start, end } of brackets) {
+        if (start === position) return end;
+        if (end === position) return start;
+      }
+
+      return -1;
+    });
+
+    this.stripCompleteJSStructures = memoize((str) => {
       // Remove substructures of the JS input string `str` in order to simplify it,
       // by removing matching pairs of quotes and parentheses/brackets.
       // Specifically, remove all but the last, non-nested pair of (), because ()
       // can affect whether the previous word is seen as a keyword.
       // E.g.: When input is `function() {`, do not replace the ().
       //       When input is `{ foo(); }`, do replace the `()`, then afterwards the `{ ... }`.
-      const brackets = this._findAllMatchingBracketsIgnoreMismatches(str);
-      const { kind, parent } = brackets.at(-1) ?? {};
+      const brackets = this.findAllMatchingBracketsIgnoreMismatches(str);
+      const { kind, parent } = brackets.at(-1) || {};
       kind === '(' && parent?.end === -1 && brackets.pop();
 
       // Remove brackets in reverse order, so that their indices remain valid.
       for (let i = brackets.length - 1; i >= 0; --i) {
         const { parent } = brackets[i];
-        if (parent?.end === -1) {
-          str = `${str.substr(0, brackets[i].start)}${str.substr(brackets[i].end + 1)}`;
-        }
+        parent?.end === -1 && (str = [
+          str.substr(0, brackets[i].start),
+          str.substr(brackets[i].end + 1),
+        ].join(''));
       }
 
       return str;
     });
   }
 
-  applyPromptState() {
-    super.setPrompt(this.$prompt[this.state]);
+  /** @param {any[]} values */
+  formatColumns = (values) => {
+    const cells = values.filter(isDefined).map(ansi.green);
+    const width = Math.max(...cells.map(this.strlen)) + 3;
+    const cols = Math.floor(this.columns / width) || 1;
+    const rows = Math.ceil(cells.length / cols) || 1;
+    if (cols === 1 || rows < 3) return this._writeToOutput(' ' + cells.join('\n '));
+    const padCell = (cell) => cell + Array(width - this.strlen(cell) + 1).join(' ');
+    this._writeToOutput(
+      reduce(cells.map(padCell), Array(rows).fill(' '), (acc, cur, i) => {
+        acc[i % acc.length] += cur;
+      }).join('\n')
+    );
+  };
+
+  get col() {
+    return getCursorPos.sync().col;
   }
 
-  setDefaultPrompt() {
-    if (this.state !== 'default') {
-      this.state = 'default';
-      this.applyPromptState();
-    }
+  get row() {
+    return getCursorPos.sync().row;
   }
 
-  setErrorPrompt() {
-    if (this.state !== 'error') {
-      this.state = 'error';
-      this.applyPromptState();
-    }
+  get rows() {
+    return termsize().rows;
   }
+
+  get columns() {
+    const { columns } = termsize();
+    const breakLength = Math.floor(columns * 0.90);
+    assign(this.writer.options, { breakLength });
+    return columns;
+  }
+
+  prompt = (preserveCursor) => {
+    const prompt = this.getPrompt();
+    prompt.includes('...') || super.setPrompt(prompt);
+    super.prompt(preserveCursor);
+  };
+
+  displayPrompt = (preserveCursor) => {
+    const prompt = this.getPrompt();
+    prompt.includes('...') || super.setPrompt(prompt);
+    super.displayPrompt(preserveCursor);
+  };
+
+  getPrompt = () => {
+    this.promptRow = this.row;
+    const prompt = ansi.strip(super.getPrompt());
+    const state = (this.promptStatus ||= 'default');
+    const highlight = ansi[{ default: 'green', error: 'red' }[state]];
+    return highlight(prompt);
+  };
+
+  getPreviewPos = () => {
+    const displayPos = this._getDisplayPos(`${this.getPrompt()}${this.line}`);
+    const cursorPos = this.line.length !== this.cursor ? this.getCursorPos() : displayPos;
+    return { displayPos, cursorPos };
+  };
+
+  pause = () => {
+    super.clearBufferedCommand();
+    super.pause();
+  };
+
+  resume = () => {
+    super.resume();
+    this.displayPrompt(true);
+  };
+
+  isCursorAtInputEnd = () => {
+    const { cursorPos, displayPos } = this.getPreviewPos();
+    return cursorPos.rows === displayPos.rows && cursorPos.cols === displayPos.cols;
+  };
+
+  _ttyWriteTitle = (str) => {
+    if (str = ansi.strip(str.trim())) {
+      process.stdout.write(`\x1b]2;${str}\x1b\\`);
+    }
+  };
+
+  /** @param {import('node:readline').Key} key */
+  _ttyWrite = (data, key) => {
+    this.clearPreview(key);
+
+    if (key.meta && key.name === 'return') {
+      return this._insertString('\n');
+    }
+
+    if (key.ctrl && key.name === 'v') {
+      const text = this.clipboard.read().replaceAll('\r', '');
+      return this._insertString(text.trim());
+    }
+
+    key.name === 'tab' || super._ttyWrite(data, key);
+    this.showPreview(key);
+  };
+
+  // prettier-ignore
+  _insertString = (str) => {
+    this.lineBeforeInsert = this.line;
+    try { return super._insertString(str); }
+    finally { this.lineBeforeInsert = undefined; }
+  };
 
   // If the cursor is moved onto or off a bracket,
   // refresh the whole line so that we can mark the matching bracket.
-  _moveCursor(dx) {
+  _moveCursor = (dx) => {
     const cursorWasOnBracket = BRACKETS.includes(this.line[this.cursor]);
     super._moveCursor(dx);
     const cursorIsOnBracket = BRACKETS.includes(this.line[this.cursor]);
     (cursorWasOnBracket || cursorIsOnBracket) && this._refreshLine();
-  }
+  };
 
   // When refreshinng the whole line, find matching brackets and keep the position
   // of the matching one in mind (if there is any).
-  _refreshLine() {
+  _refreshLine = () => {
     try {
-      if (BRACKETS.includes(this.line[this.cursor])) {
-        this.highlightBracketPosition = this._findMatchingBracket(this.line, this.cursor);
-      }
-      return super._refreshLine();
+      BRACKETS.includes(this.line[this.cursor]) && (
+        this.highlightBracketPosition = this.findMatchingBracket(this.line, this.cursor)
+      );
+      super._refreshLine();
     } finally {
       this.highlightBracketPosition = -1;
     }
-  }
+  };
 
-  _writeToOutput(stringToWrite) {
+  /** @returns {void} */
+  _writeToOutput = (str) => {
     // Skip false-y values, and if we print only whitespace or have
     // not yet been fully initialized, just write to output directly.
-    if (!stringToWrite) return;
-    if (!this._colorize || stringToWrite.match(/^\s+$/)) {
-      this.output.write(stringToWrite);
-      return;
-    }
-
-    // prettier-ignore
-    const appendableString = (
-      this.lineBeforeInsert !== undefined &&
-      `${this.lineBeforeInsert}${stringToWrite}` === this.line
-    );
+    if (!this.colorize || !str?.trim?.()) return void this.output.write(str);
 
     // In this case, the method is being called from _insertString,
     // which appends a string to the end of the current line.
-    if (appendableString) this._writeAppendedString(stringToWrite);
-    else if (stringToWrite.startsWith(this._prompt)) this._writeFullLine(stringToWrite);
-    else super._writeToOutput(stringToWrite); // fallback to native REPL implementation
-  }
+    `${this.lineBeforeInsert ?? +this.line}${str}` === this.line ?
+      this._writeAppendedString(str) :
+      str.startsWith(this.getPrompt()) ?
+      this._writeFullLine(str) :
+      super._writeToOutput(str);
+  };
 
-  _writeAppendedString(stringToWrite) {
+  _writeAppendedString = (str) => {
     // First, we simplify whatever existing line structure is present in a
     // way that preserves highlighting of any subsequent part of the code.
     // The goal here is to reduce the amount of code that needs to be highlighted,
     // because this typically runs once for each character that is entered.
-    const simplified = this._stripCompleteJSStructures(this.lineBeforeInsert);
+    const simplified = this.stripCompleteJSStructures(this.lineBeforeInsert);
     // Colorize the 'before' state.
-    const before = this._colorize(simplified);
+    const before = this.colorize(simplified);
     // Colorize the 'after' state, using the same simplification (this works because
-    // `lineBeforeInsert + stringToWrite === line` implies that
-    // `simplified       + stringToWrite` is a valid simplification of `line`,
+    // `lineBeforeInsert + str === line` implies that
+    // `simplified       + str` is a valid simplification of `line`,
     // and the former is a precondition for this method to be called).
-    const after = this._colorize(simplified + stringToWrite);
+    const after = this.colorize(simplified + str);
     // Find the first character or escape sequence that differs in `before` and `after`.
-    const commonPrefixLength = computeCommonPrefixLength(before, after);
+    const commonPrefixLength = this.computeCommonPrefixLength(before, after);
     // Gather all escape sequences that occur in the *common* part of the string.
     // Applying them all one after another puts the terminal into the state of the
     // highlighting at the divergence point.
@@ -138,8 +253,8 @@ class REPLServer extends REPL.REPLServer {
     // output coloring.
     const lastForegroundColorReset = ansiStatements.lastIndexOf('\x1b[39m');
     if (lastForegroundColorReset !== -1) {
-      ansiStatements = ansiStatements.filter(
-        (sequence, i) => i > lastForegroundColorReset || !sequence.match(/^\x1b\[3\d.*m$/)
+      ansiStatements = ansiStatements.filter((sequence, i) =>
+        i > lastForegroundColorReset || !/^\x1b\[3\d.*m$/.test(sequence)
       );
     }
 
@@ -147,65 +262,39 @@ class REPLServer extends REPL.REPLServer {
     // back to the common prefix of the two. Do that by counting all the
     // non-escape-sequence characters in what comes after the common prefix
     // in `before`.
-    const backtrackLength = characterCount(this.ansi.strip(before.slice(commonPrefixLength)));
+    const backtrackLength = this.strlen(before.slice(commonPrefixLength));
     // Put it all together: Backtrack from `before` to the common prefix, apply
     // all the escape sequences that were present before, and then apply the
     // new output from `after`.
-    this.output.write(
-      `${'\b'.repeat(backtrackLength)}${ansiStatements.join('')}${after.slice(commonPrefixLength)}`
-    );
-  }
+    this.output.write([
+      '\b'.repeat(backtrackLength),
+      ansiStatements.join(''),
+      after.slice(commonPrefixLength),
+    ].join(''));
+  };
 
-  _writeFullLine(stringToWrite) {
+  _writeFullLine = (str) => {
+    const prompt = this.getPrompt();
+    str = str.substring(prompt.length);
     // If the output starts with the prompt (which is when this method is called),
     // it's reasonable to assume that we're printing a full line (which happens
     // relatively frequently with the Node.js REPL).
     // In those cases, we split the string into prompt and non-prompt parts,
     // and colorize the full non-prompt part.
-    stringToWrite = stringToWrite.substring(this._prompt.length);
     if (this.highlightBracketPosition !== -1) {
       // If there is a matching bracket, we mark it in the string before
       // highlighting using BOM characters (because it seems safe to assume
       // that they are ignored by highlighting) so that we can remember where
-      // the bracket was.
-      stringToWrite = this._colorize(
-        `${stringToWrite.substring(0, this.highlightBracketPosition)}\ufeff${
-          stringToWrite[this.highlightBracketPosition]
-        }\ufeff${stringToWrite.substring(this.highlightBracketPosition + 1)}`
-      );
+      // the bracket was. Then remove the BOM characters again and colorize the bracket in between.
 
-      // Then remove the BOM characters again and colorize the bracket in between.
-      stringToWrite = stringToWrite.replace(
-        /\ufeff(.+)\ufeff/,
-        (_, bracket) => this.ansi.underline(bracket)
-      );
-    } else stringToWrite = this._colorize(stringToWrite);
-
-    this.output.write(`${this._prompt}${stringToWrite}`);
-  }
-
-  // prettier-ignore
-  _insertString(c) {
-    this.lineBeforeInsert = this.line;
-    try { return super._insertString(c); }
-    finally { this.lineBeforeInsert = undefined; }
-  }
-
-  // Find the matching bracket opposite of the one at `position`.
-  _findMatchingBracket(line, position) {
-    const brackets = this._findAllMatchingBracketsIncludeMismatches(line);
-    for (const { start, end } of brackets) {
-      if (start === position) return end;
-      if (end === position) return start;
-    }
-
-    return -1;
-  }
+      str = this.colorize([
+        str.substring(0, this.highlightBracketPosition),
+        str[this.highlightBracketPosition],
+        str.substring(this.highlightBracketPosition + 1),
+      ].join('\ufeff')).replace(/\ufeff(.+)\ufeff/, (_, bracket) => ansi.underline(bracket));
+    } else str = this.colorize(str);
+    this.output.write(prompt + str);
+  };
 }
 
-export const defaultREPL = REPL;
-
-export default {
-  REPLServer,
-  start: (options) => new REPLServer(options),
-};
+export default { start, REPLServer };

@@ -1,7 +1,7 @@
+import escapes from 'ansi-escapes';
 import { isatty } from 'node:tty';
+import { define } from './util.js';
 
 isatty(1) && (process.env.FORCE_COLOR = '3');
 
-export * from 'ansis';
-
-export const ansi = await import('ansis').then(({ Ansis }) => new Ansis());
+export const ansi = await import('ansis').then(({ Ansis }) => define(new Ansis(), escapes));

@@ -1,10 +1,14 @@
-import type repl from 'node:repl';
-import type { ExecaReturnValue, Options as ExecOptions, TemplateExpression } from 'execa';
+import type * as repl from 'node:repl';
+import type * as rtepl from './lib/index.js';
+import type { AnsiColors, Ansis, AnsiStyles } from 'ansis';
+import type { ExecaReturnValue, Options as ExecOptions, Result } from 'execa';
 
 type REPL = typeof repl;
-declare const rtepl: REPL;
+
+type BaseReplOptions = Except<repl.ReplOptions, 'preview' | 'prompt'>;
+
 declare module 'repl' {
-  interface ReplOptions extends repl.ReplOptions {
+  interface ReplOptions extends BaseReplOptions {
     /**
      * Shell to use when running commands with `$` *(wrapped `execa` instance)* in the repl.
      * @defaultValue `'bash'`
@@ -23,9 +27,8 @@ declare module 'repl' {
      */
     sheet?: SheetConfig;
     /**
-     * Define commands to be handled with a custom callback instead of the repl server when a
-     * matching command name is given.
-     * - When `'*'` is specified as a property, anything can be intercepted by the defined callback.
+     * Define commands to be handled with a custom callback when a matching command name *(i.e. first word)* is given.
+     * - When `'*'` is specified, everything may be intercepted by the defined callback.
      * - Note: Differs from node's `repl.defineCommand` in that the `'.'` prefix is not needed.
      *
      * @example
@@ -37,6 +40,10 @@ declare module 'repl' {
      */
     commands?: {
       [k in '*' | (string & {})]?: (cmd: {
+        /** Execa command runner. */
+        $: rtepl.$['run'];
+        /** The current repl instance. */
+        repl: rtepl.REPLServer;
         /** The full command-line string. */
         command: string;
         /** Parsed arguments passed to the command as a string. */
@@ -45,8 +52,8 @@ declare module 'repl' {
         argv: string[];
         /** The default `repl.eval` callback (default arguments passed if none were given). */
         next: repl.REPLEval;
-        /** The current repl instance. */
-        repl: repl.REPLServer;
+        /** @see {@link https://www.npmjs.com/package/ansis} */
+        ansi: Ansis;
       }, _: EvalArgs) => void;
     };
     /**
@@ -78,19 +85,25 @@ declare module 'repl' {
   }
 }
 
-export default rtepl;
-export type * from 'node:repl';
-export declare const start: REPL['start'];
-export declare const writer: REPL['writer'];
-export declare const REPLServer: REPL['REPLServer'];
+export declare const start: rtepl.REPLStart;
+export declare const writer: repl.REPLWriter;
+export declare const REPLServer: rtepl.REPLServer;
 export declare const REPL_MODE_SLOPPY: REPL['REPL_MODE_SLOPPY'];
 export declare const REPL_MODE_STRICT: REPL['REPL_MODE_STRICT'];
+export default { start, writer, REPLServer, REPL_MODE_SLOPPY, REPL_MODE_STRICT };
+
 export declare const displayEnvironmentInfo: () => void;
+
+export type * from 'node:repl';
+
+export type REPLServer = rtepl.REPLServer;
+
+export type ReplOptions = BaseReplOptions;
 
 /** @internal The rest of the arguments that were passed to `repl.eval` before the command was intercepted. */
 export type REPLEvalParams = Parameters<repl.REPLEval> extends [any, ...infer rest] ? rest : never;
 
-export type Style = import('ansis').AnsiColors | import('ansis').AnsiStyles | `#${string}`;
+export type Style = AnsiColors | AnsiStyles | `#${string}`;
 
 export type SheetConfig = {
   [classname: string]: Style | Style[] | undefined;
@@ -505,3 +518,8 @@ export type Theme =
   | 'base16/woodland'
   | 'base16/xcode-dusk'
   | 'base16/zenburn';
+
+// prettier-ignore
+type IsEqual<A, B> = (<G>() => G extends A ? 1 : 2) extends (<G>() => G extends B ? 1 : 2) ? true : false;
+type Filter<A, B> = IsEqual<A, B> extends true ? never : (A extends B ? never : A);
+type Except<T, K extends keyof T> = { [k in keyof T as Filter<k, K>]: T[k] };

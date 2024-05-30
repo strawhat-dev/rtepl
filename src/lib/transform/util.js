@@ -1,22 +1,57 @@
-import memoize from 'memoize-one';
-import { transform } from '@esbuild-kit/core-utils';
-import { createRequire, isBuiltin } from 'node:module';
 import { join } from 'node:path';
+import { generate } from 'astring';
+import { transform } from 'esbuild';
+import { createRequire, isBuiltin } from 'node:module';
+import { statementDispatch } from './abstract-syntax-tree.js';
+import { memoize } from '../util.js';
 
-/** @type {import('meriyah')['parse']} */
-export const parse = await import('meriyah').then((meriyah) => memoize(meriyah.parse));
+/**
+ * {@link https://github.com/privatenumber/tsx/blob/master/src/patch-repl.ts}
+ * @type {import('esbuild').TransformOptions}
+ */
+const esconfig = {
+  minify: false,
+  loader: 'tsx',
+  format: 'esm',
+  platform: 'node',
+  target: 'node20',
+  jsx: 'automatic',
+  define: { require: 'global.require' },
+  tsconfigRaw: { compilerOptions: { preserveValueImports: true } },
+};
 
-/** @type {import('astring')['generate']} */
-export const generate = await import('astring').then((astring) => memoize(astring.generate));
+/** @type {(code: string) => import('meriyah').ESTree.Program} */
+const parse = await import('meriyah').then(({ parse }) =>
+  memoize((code) => parse(code, { next: true, module: true, jsx: true, specDeviation: true }))
+);
 
 /**
  * @param {string} code
  * @param {string} sourcefile
  */
 export const esbuild = async (code, sourcefile) => {
-  const args = [code, sourcefile, { ...esconfig, sourcefile }];
-  ({ code } = await transform(...args).catch(() => ({ code })));
+  ({ code } = await transform(code, { ...esconfig, sourcefile }).catch(() => ({ code })));
   return code;
+};
+
+/**
+ * @param {string} code
+ * @param {import('repl').ReplOptions['extensions']} opts
+ */
+export const transpile = (code, opts) => {
+  try {
+    const ast = parse(code);
+    const len = ast.body?.length;
+    for (let i = 0; i < len; ++i) {
+      const statement = ast.body[i];
+      const transformStatement = statementDispatch[statement?.type];
+      transformStatement && (ast.body[i] = transformStatement(statement, opts));
+    }
+
+    return generate(ast);
+  } catch {
+    return code;
+  }
 };
 
 /**
@@ -25,7 +60,7 @@ export const esbuild = async (code, sourcefile) => {
  */
 export const shouldSkipParsing = (code, opts) => (
   !/(\$`|\b(let|const|import|require)\b)/.test(code) || // naive check
-  !Object.values(opts).some((enabled) => enabled)
+  !Object.values(opts).some(Boolean)
 );
 
 /**
@@ -48,19 +83,4 @@ export const isUnresolvableImport = (name, enabled) => {
   } catch (_) {}
 
   return true;
-};
-
-/**
- * {@link https://github.com/privatenumber/tsx/blob/master/src/repl.ts}
- * @type {Parameters<transform>[2]}
- */
-const esconfig = {
-  minify: false,
-  loader: 'tsx',
-  format: 'esm',
-  platform: 'node',
-  target: 'node20',
-  jsx: 'automatic',
-  define: { require: 'global.require' },
-  tsconfigRaw: { compilerOptions: { preserveValueImports: true } },
 };

@@ -1,3 +1,12 @@
+/** @type {import('node:util').InspectOptions} */
+export const inspectDefaults = {
+  colors: true,
+  depth: Infinity,
+  compact: Infinity,
+  maxArrayLength: Infinity,
+  maxStringLength: Infinity,
+};
+
 export const supportedProps = /** @type {const} */ ([
   'color',
   'font-style',

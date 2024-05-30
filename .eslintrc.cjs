@@ -1,8 +1,9 @@
-/** @type {import('eslint').Linter.Config} */
-module.exports = {
+const { defineConfig } = require('eslint-define-config');
+
+module.exports = defineConfig({
   root: true,
-  env: { node: true, es2022: true },
   extends: ['eslint:recommended'],
-  parserOptions: { sourceType: 'module' },
-  rules: { 'no-empty': 0, 'no-control-regex': 0 },
-};
+  env: { node: true, es2022: true },
+  parserOptions: { sourceType: 'module', ecmaVersion: 'latest' },
+  rules: { 'no-empty': 0, 'no-cond-assign': 0, 'no-control-regex': 0 },
+});
