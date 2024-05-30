@@ -6,7 +6,7 @@ import { define, initExeca, props, setupREPL, sorted } from './util.js';
 import { defaultConfig, parserOptions } from './config.js';
 import { ansi } from './ansi.js';
 
-const { assign, defineProperties } = Object;
+const { defineProperties } = Object;
 
 const displayEnvironmentInfo = () => {
   const platform = process.platform;
@@ -23,6 +23,8 @@ export const initREPL = (init = {}) => {
   const start = instance.start.bind(instance);
   return define(instance, {
     start(options = {}) {
+      const underscore = Symbol('_');
+      global[underscore] = global._;
       const { REPL_INIT_CWD } = process.env;
       REPL_INIT_CWD && process.chdir(REPL_INIT_CWD);
       const config = { ...defaultConfig, ...init, ...options };
@@ -35,8 +37,8 @@ export const initREPL = (init = {}) => {
         context: defineProperties(
           // repl context globals / utils
           define(repl.context, { $, ansi, props, sorted }),
-          // skip assignment to "_" warning message.
-          { _: { get: () => this._, set: (_) => assign(this, { _ }) } }
+          // allow assignment to "_" and skip warning message.
+          { _: { get: () => global[underscore], set: (value) => global[underscore] = value } }
         ),
         async eval(command, ...rest) {
           const next = async (...args) => {
