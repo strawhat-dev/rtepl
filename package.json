@@ -41,8 +41,8 @@
     "yargs-parser": "^21.1.1"
   },
   "devDependencies": {
-    "@types/node": "^20.12.13",
-    "@types/which": "^3.0.3",
+    "@types/node": "^20.13.0",
+    "@types/which": "^3.0.4",
     "@types/yargs-parser": "^21.0.3",
     "eslint": "8.57.0",
     "eslint-define-config": "^2.1.0"

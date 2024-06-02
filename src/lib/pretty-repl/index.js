@@ -1,7 +1,6 @@
 import repl from 'node:repl';
 import termsize from 'terminal-size';
 import stringWidth from 'fast-string-width';
-import getCursorPos from 'get-cursor-position';
 import { inspectDefaults } from './config.js';
 import { define, isDefined, memoize, reduce } from '../util.js';
 import { ansiRegex, computeCommonPrefixLength, matchingBrackets } from './util.js';
@@ -24,6 +23,7 @@ export class REPLServer extends repl.REPLServer {
     super(assign(options, { preview: false }));
     super.removeHistoryDuplicates = true;
     super.tabSize = 4;
+    this.rows = termsize().rows;
     this.promptRow = undefined;
     this.promptStatus = 'default';
     this.lineBeforeInsert = undefined;
@@ -96,24 +96,22 @@ export class REPLServer extends repl.REPLServer {
     );
   };
 
-  get col() {
-    return getCursorPos.sync().col;
-  }
-
-  get row() {
-    return getCursorPos.sync().row;
-  }
-
-  get rows() {
-    return termsize().rows;
-  }
-
   get columns() {
-    const { columns } = termsize();
+    const { rows, columns } = termsize();
     const breakLength = Math.floor(columns * 0.90);
-    assign(this.writer.options, { breakLength });
+    assign(assign(this, { rows }).writer.options, { breakLength });
     return columns;
   }
+
+  pause = () => {
+    super.clearBufferedCommand();
+    super.pause();
+  };
+
+  resume = () => {
+    super.resume();
+    this.displayPrompt(true);
+  };
 
   prompt = (preserveCursor) => {
     const prompt = this.getPrompt();
@@ -141,23 +139,13 @@ export class REPLServer extends repl.REPLServer {
     return { displayPos, cursorPos };
   };
 
-  pause = () => {
-    super.clearBufferedCommand();
-    super.pause();
-  };
-
-  resume = () => {
-    super.resume();
-    this.displayPrompt(true);
-  };
-
   isCursorAtInputEnd = () => {
     const { cursorPos, displayPos } = this.getPreviewPos();
     return cursorPos.rows === displayPos.rows && cursorPos.cols === displayPos.cols;
   };
 
   /** @param {import('node:readline').Key} key */
-  _ttyWrite = (data, key) => {
+  _ttyWrite = (data, key = {}) => {
     this.clearPreview(key);
 
     if (key.meta && key.name === 'return') {
