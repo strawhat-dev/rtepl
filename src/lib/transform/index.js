@@ -1,13 +1,31 @@
-import { esbuild, shouldSkipParsing, transpile } from './util.js';
+import { generate } from 'astring';
+import { esbuild, parse } from './util.js';
+import { dispatchAST } from './abstract-syntax-tree.js';
 
 /**
- * @param {Parameters<import('repl').REPLEval>} args
- * @param {import('repl').ReplOptions['extensions']} extensions
+ * @typedef {import('repl').REPLEval} REPLEval
+ * @typedef {Parameters<REPLEval>} REPLParams
+ * @type {import('rtepl').SetReturnType<REPLEval, Promise<REPLParams>>}
  */
-export const transpileREPL = async (args, extensions) => {
-  const { typescript, ...opts } = { ...extensions };
-  if (typescript) args[0] = await esbuild(args[0], args[2]);
-  if (shouldSkipParsing(args[0], opts)) return args;
-  args[0] = transpile(args[0], opts);
+export const transpileREPL = async (code, ...args) => {
+  await esbuild(code, args[1]).then(transform).then(args.unshift.bind(args));
   return args;
+};
+
+/** @param {string} code */
+const transform = (code) => {
+  if (!/(\$`|\b(let|const|import|require)\b)/.test(code)) return code;
+  try {
+    const ast = parse(code);
+    const len = ast.body?.length;
+    for (let i = 0; i < len; ++i) {
+      const statement = ast.body[i];
+      const transformed = dispatchAST[statement?.type]?.(statement);
+      transformed && (ast.body[i] = transformed);
+    }
+
+    code = generate(ast);
+  } finally {
+    return code;
+  }
 };

@@ -2,7 +2,7 @@ import repl from 'node:repl';
 import termsize from 'terminal-size';
 import stringWidth from 'fast-string-width';
 import { inspectDefaults } from './config.js';
-import { define, isDefined, memoize, reduce } from '../util.js';
+import { define, entries, isDefined, memoize, reduce } from '../util.js';
 import { ansiRegex, computeCommonPrefixLength, matchingBrackets } from './util.js';
 import { initHighlighter } from './highlight.js';
 import { setupPreview } from './preview.js';
@@ -83,14 +83,15 @@ export class REPLServer extends repl.REPLServer {
 
   /** @param {any[]} values */
   formatColumns = (values) => {
+    const pad = ' ';
     const cells = values.filter(isDefined).map(ansi.green);
     const width = Math.max(...cells.map(this.strlen)) + 3;
     const cols = Math.floor(this.columns / width) || 1;
     const rows = Math.ceil(cells.length / cols) || 1;
-    if (cols === 1 || rows < 3) return this._writeToOutput(' ' + cells.join('\n '));
-    const padCell = (cell) => cell + Array(width - this.strlen(cell) + 1).join(' ');
-    this._writeToOutput(
-      reduce(cells.map(padCell), Array(rows).fill(' '), (acc, cur, i) => {
+    if (cols === 1 || rows < 3) return console.log(pad + cells.join('\n '));
+    const padCell = (cell) => cell + Array(width - this.strlen(cell) + 1).join(pad);
+    console.log(
+      reduce(cells.map(padCell), Array(rows).fill(pad), (acc, cur, i) => {
         acc[i % acc.length] += cur;
       }).join('\n')
     );
@@ -133,47 +134,6 @@ export class REPLServer extends repl.REPLServer {
     return highlight(prompt);
   };
 
-  getPreviewPos = () => {
-    const displayPos = this._getDisplayPos(`${this.getPrompt()}${this.line}`);
-    const cursorPos = this.line.length !== this.cursor ? this.getCursorPos() : displayPos;
-    return { displayPos, cursorPos };
-  };
-
-  isCursorAtInputEnd = () => {
-    const { cursorPos, displayPos } = this.getPreviewPos();
-    return cursorPos.rows === displayPos.rows && cursorPos.cols === displayPos.cols;
-  };
-
-  /** @param {import('node:readline').Key} key */
-  _ttyWrite = (data, key = {}) => {
-    this.clearPreview(key);
-
-    if (key.meta && key.name === 'return') {
-      return this._insertString('\n');
-    }
-
-    if (key.ctrl && key.name === 'v') {
-      const text = this.clipboard.read().replaceAll('\r', '');
-      return this._insertString(text.trim());
-    }
-
-    key.name === 'tab' || super._ttyWrite(data, key);
-    this.showPreview(key);
-  };
-
-  _ttyWriteTitle = (str) => {
-    if (str = ansi.strip(str.trim())) {
-      process.stdout.write(`\x1b]2;${str}\x1b\\`);
-    }
-  };
-
-  // prettier-ignore
-  _insertString = (str) => {
-    this.lineBeforeInsert = this.line;
-    try { return super._insertString(str); }
-    finally { this.lineBeforeInsert = undefined; }
-  };
-
   // If the cursor is moved onto or off a bracket,
   // refresh the whole line so that we can mark the matching bracket.
   _moveCursor = (dx) => {
@@ -187,16 +147,23 @@ export class REPLServer extends repl.REPLServer {
   // of the matching one in mind (if there is any).
   _refreshLine = () => {
     try {
-      BRACKETS.includes(this.line[this.cursor]) && (
-        this.highlightBracketPosition = this.findMatchingBracket(this.line, this.cursor)
-      );
+      if (BRACKETS.includes(this.line[this.cursor])) {
+        this.highlightBracketPosition = this.findMatchingBracket(this.line, this.cursor);
+      }
+
       super._refreshLine();
     } finally {
       this.highlightBracketPosition = -1;
     }
   };
 
-  /** @returns {void} */
+  // prettier-ignore
+  _insertString = (str) => {
+    this.lineBeforeInsert = this.line;
+    try { return super._insertString(str); }
+    finally { this.lineBeforeInsert = undefined; }
+  };
+
   _writeToOutput = (str) => {
     // Skip false-y values, and if we print only whitespace or have
     // not yet been fully initialized, just write to output directly.
@@ -280,6 +247,14 @@ export class REPLServer extends repl.REPLServer {
       ].join('\ufeff')).replace(/\ufeff(.+)\ufeff/, (_, bracket) => ansi.underline(bracket));
     } else str = this.colorize(str);
     this.output.write(prompt + str);
+  };
+
+  _ttyWriteTitle = (value) => {
+    let data = value ?? '';
+    if (Array.isArray(data)) data = ` | ${data.join(', ')} | `;
+    else if (typeof data !== 'object') data = ansi.strip(String(data).trim());
+    else data = ` | ${entries(data).map((e) => e.map(JSON.stringify).join('=')).join(', ')} | `;
+    process.stderr.write(`\x1b]2;${data}\x1b\\`);
   };
 }
 

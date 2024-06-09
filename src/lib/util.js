@@ -1,23 +1,6 @@
-import { $ } from 'execa';
-import which from 'which';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import findCacheDir from 'find-cache-dir';
-import { execaOptions } from './config.js';
-
 const { isArray } = Array;
-const {
-  keys,
-  fromEntries,
-  defineProperty,
-  getPrototypeOf,
-  getOwnPropertyNames,
-} = Object;
 
-const clipboard = await import('clipboardy').then((cb) => ({
-  read: cb.default.readSync,
-  write: cb.default.write,
-}));
+const { keys, fromEntries, defineProperty, getPrototypeOf, getOwnPropertyNames } = Object;
 
 export const isDefined = (x) => x != null && !Number.isNaN(x);
 
@@ -25,13 +8,13 @@ export const isDefined = (x) => x != null && !Number.isNaN(x);
 export const id = (x) => x;
 
 /** @type {<T extends ((...args: readonly any[]) => any)>(fn: T) => T} */
-export const memoize = await import('memoize-one').then((module) => module.default);
+export const memoize = await import('memoize-one').then((memo) => memo.default);
 
 /** @type {<T extends readonly any[]>(x: T) => T} */
 export const asArray = (x) => isArray(x) ? x : isDefined(x) ? [x] : [];
 
 /** @param {string} x @param {number} i */
-export const splitIndex = (x, i) => /** @type {const} */ ([x.slice(0, i), x.slice(i)]);
+export const splitIndex = (x, i) => /** @type {const} */ ([x?.slice(0, i), x?.slice(i)]);
 
 export const reduce = (arr, ...args) => {
   const [init = {}, reducer] = args;
@@ -77,28 +60,12 @@ export const entries = (obj) => {
   return ret;
 };
 
-export const sorted = (...args) => {
-  if (!args.length) return (res) => sorted(res, id);
-  if (args.length === 1 && typeof args[0] === 'function') return (res) => sorted(res, args[0]);
-  const [obj, sortkey = id] = args;
-  const sortOptions = ['en-US', { usage: 'sort', numeric: true }];
-  const compareFn = (a, b) => {
-    [a, b] = [sortkey(a), sortkey(b)];
-    if (typeof a === 'string') return a.localeCompare(b, ...sortOptions);
-    if (typeof b === 'string') return -b.localeCompare(a, ...sortOptions);
-    return a < b ? -1 : a > b ? 1 : 0;
-  };
-
-  if (obj?.[Symbol.iterator]) return [...obj].sort(compareFn);
-  return fromEntries(entries(obj).sort(([a], [b]) => compareFn(a, b)));
-};
-
 /**
  * @template T
  * @param {Readonly<T>} obj
  * @returns {(keyof T)[]}
  */
-export const props = (obj) => {
+export const getprops = (obj) => {
   if (obj == null) return [];
   const set = new Set();
   let cur = getOwnPropertyNames(obj);
@@ -111,39 +78,56 @@ export const props = (obj) => {
   return sorted(set, (prop) => prop.replace(/^([^a-z$])/i, 'zz$1'));
 };
 
-/** @param {import('rtepl').REPLServer} repl */
-export const setupREPL = (repl) => {
-  try {
-    const cwd = dirname(fileURLToPath(import.meta.url));
-    const dir = findCacheDir({ cwd, name: 'rtepl', create: true });
-    dir && repl.setupHistory(join(dir, '.node_repl_history'), id);
-  } catch (_) {}
-
-  define(repl.context, { resolve_dynamic_module });
-  return define(repl, { clipboard });
-};
-
-/** @param {import('rtepl').REPLServer} repl */
-export const initExeca = (repl, shell = 'bash') => {
-  shell = which.sync(shell, { nothrow: true });
-  const execa = $({ ...execaOptions, shell });
-  return define(execa({ stdio: 'pipe' }), {
-    repl,
-    /** @param {[TemplateStringsArray, ...any[]]} args */
-    async run(...args) {
-      repl.clearBufferedCommand();
-      return new Promise((resolve) => {
-        const proc = execa({ stdio: 'inherit', forceKillAfterDelay: 100 })(...args);
-        repl.on('SIGINT', () => proc.kill('SIGKILL'));
-        proc.once('exit', repl.resume);
-        return resolve(proc);
-      });
-    },
+/**
+ * case-insensitive string methods wrapper
+ * @param {string} str
+ */
+export const istr = (str) => {
+  if (!str) return;
+  str = str.toLowerCase();
+  return /** @type {const} */ ({
+    includes: (search) => str.includes(search?.toLowerCase()),
+    startsWith: (search) => str.startsWith(search?.toLowerCase()),
+    endsWith: (search) => str.endsWith(search?.toLowerCase()),
   });
 };
 
-const resolve_dynamic_module = (key, defaultImport, namedImport) => {
-  const mod = global[key];
-  defaultImport && (global[defaultImport] = mod.default || mod);
-  return namedImport in mod ? mod : mod.default;
+/**
+ * @template {string} SubString
+ * @param {string} str
+ * @param {SubString} substr
+ * @returns {[string, SubString | '', string]}
+ */
+export const splitSubstr = (str, substr) => {
+  if (str == null) return ['', '', ''];
+  const start = str.toLowerCase().indexOf(substr.toLowerCase?.());
+  if (!~start) return [str, '', ''];
+  const end = start + substr.length;
+  const left = str.slice(0, start);
+  const mid = str.slice(start, end);
+  const right = str.slice(end);
+  return [left, mid, right];
+};
+
+/**
+ * @template {object} T
+ * @param {[T, (item: T extends any[] ? T[number] : keyof T) => any]} args
+ * @returns {T}
+ */
+export const sorted = (...args) => {
+  if (!args.length) return (x) => sorted(x, id);
+  if (args.length === 1 && typeof args[0] === 'function') return (x) => sorted(x, args[0]);
+  const [obj, sortkey] = args;
+  const compare = compareWithKey(sortkey);
+  if (obj?.[Symbol.iterator]) return [...obj].sort(compare);
+  return fromEntries(entries(obj).sort(([a], [b]) => compare(a, b)));
+};
+
+const sortOptions = /** @type {const} */ (['en-US', { usage: 'sort', numeric: true }]);
+
+const compareWithKey = (sortkey = id) => (a, b) => {
+  [a, b] = [sortkey(a), sortkey(b)];
+  if (typeof a === 'string') return a.localeCompare(b, ...sortOptions);
+  if (typeof b === 'string') return -b.localeCompare(a, ...sortOptions);
+  return a < b ? -1 : a > b ? 1 : 0;
 };

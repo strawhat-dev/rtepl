@@ -44,42 +44,16 @@ declare module 'repl' {
         /** The current repl instance. */
         repl: rtepl.REPLServer;
         /** The full command-line string. */
-        command: string;
+        cmd: string;
         /** Parsed arguments passed to the command as a string. */
         args: string;
         /** Parsed arguments passed to the command as an array. */
         argv: string[];
         /** The default `repl.eval` callback (default arguments passed if none were given). */
-        next: repl.REPLEval;
+        evaluate: repl.REPLEval;
         /** @see {@link https://www.npmjs.com/package/ansis} */
         ansi: Ansis;
       }, _: EvalArgs) => void;
-    };
-    /**
-     * Extensions that affect transpilation process. Commands that would normally be invalid in the
-     * repl context may be transpiled to compatible code, allowing for quick prototyping and
-     * flexibility while testing snippets.
-     * @defaultValue All options are `true` by default, *unless `extensions` is explicitly given and defined*.
-     */
-    extensions?: {
-      /**
-       * Automatically use a cdn (jsdelivr) for all imports when the imported module is not a node
-       * built-in, or the module cannot be resolved from the current working directory.
-       * - Note: `--experimental-network-imports` flag must be enabled
-       */
-      cdn?: boolean;
-      /**
-       * Allow redeclaring `let` & `const`, similarily to the DevTools console.\
-       * _(Converts all unscoped declarations to `var`)_
-       */
-      redeclarations?: boolean;
-      /** Allow for static import syntax _(which will be transpiled to dynamic imports if enabled)_. */
-      staticImports?: boolean;
-      /**
-       * Enable transpiling typescript with esbuild.
-       * - Note: Unlike `ts-node`'s repl, this does **not** perform any typechecking (similarly to `tsx`).
-       */
-      typescript?: boolean;
     };
   }
 }
@@ -527,7 +501,15 @@ export type Theme =
 
 // prettier-ignore
 type IsEqual<A, B> = (<G>() => G extends A ? 1 : 2) extends (<G>() => G extends B ? 1 : 2) ? true : false;
+type IsUnknown<T> = unknown extends T ? ([T] extends [null] ? false : true) : false;
 type Filter<A, B> = IsEqual<A, B> extends true ? never : (A extends B ? never : A);
 type Except<T, K extends keyof T> = { [k in keyof T as Filter<k, K>]: T[k] };
 type ReadonlyRecord<K, V> = { readonly [key in K]: V } & {};
 type VoidFn = (...args: any[]) => void;
+
+// prettier-ignore
+export type SetReturnType<Fn extends (...args: any[]) => any, Return> = (
+  Fn extends (this: infer arg, ...args: infer args) => any ?
+  (IsUnknown<arg> extends true ? (...args: args) => Return : (this: arg, ...args: args) => Return) :
+  (...args: Parameters<Fn>) => Return
+);

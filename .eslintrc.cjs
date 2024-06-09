@@ -5,5 +5,5 @@ module.exports = defineConfig({
   extends: ['eslint:recommended'],
   env: { node: true, es2022: true },
   parserOptions: { sourceType: 'module', ecmaVersion: 'latest' },
-  rules: { 'no-empty': 0, 'no-cond-assign': 0, 'no-control-regex': 0 },
+  rules: { 'no-empty': 0, 'no-cond-assign': 0, 'no-unsafe-finally': 0, 'no-control-regex': 0 },
 });

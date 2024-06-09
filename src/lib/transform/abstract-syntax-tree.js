@@ -1,19 +1,17 @@
 import { isUnresolvableImport } from './util.js';
 
-export const statementDispatch = /** @type {const} */ ({
-  /** @param {import('meriyah').ESTree.ExpressionStatement} statement */
-  ExpressionStatement(statement) {
-    const { type, tag: object } = statement.expression;
-    if (!(type === 'TaggedTemplateExpression' && object?.name === '$')) return statement;
+export const dispatchAST = /** @type {const} */ ({
+  /** @param {import('meriyah').ESTree.ExpressionStatement} */
+  ExpressionStatement({ expression, ...rest }) {
+    const { type, tag: object = {} } = expression ?? {};
+    if (`${object.name}${object.type}${type}` !== '$IdentifierTaggedTemplateExpression') return;
     const tag = { type: 'MemberExpression', object, property: { type: 'Identifier', name: 'run' } };
-    const argument = { type: 'AwaitExpression', argument: { ...statement.expression, tag } };
-    const expression = { type: 'UnaryExpression', operator: 'void', prefix: true, argument };
-    return Object.assign(statement, { expression });
+    return { ...rest, expression: { ...expression, type, tag } };
   },
   /** @param {import('meriyah').ESTree.VariableDeclaration} declaration */
-  VariableDeclaration(declaration, { cdn, redeclarations }) {
-    if (redeclarations) declaration.kind = 'var';
-    if (!cdn || !declaration.declarations?.length) return declaration;
+  VariableDeclaration(declaration) {
+    declaration.kind = 'var';
+    if (!declaration.declarations?.length) return;
     const [{ id, init }] = declaration.declarations;
     const { type, source } = { ...init?.argument, ...init?.argument?.callee?.object };
     // dynamic import -> resolved dynamic import
@@ -34,8 +32,7 @@ export const statementDispatch = /** @type {const} */ ({
     return declaration;
   },
   /** @param {import('meriyah').ESTree.ImportDeclaration} declaration */
-  ImportDeclaration(declaration, { cdn, staticImports }) {
-    if (!staticImports) return declaration;
+  ImportDeclaration(declaration) {
     const { specifiers, source: { value: name } } = declaration;
     const id = specifiers.reduce((acc, { type, local, imported }) => {
       if (type === 'ImportDefaultSpecifier') acc.name = local.name;
@@ -60,7 +57,7 @@ export const statementDispatch = /** @type {const} */ ({
       return acc;
     }, { type: 'Identifier' });
 
-    return initImportDeclaration({ name, id, cdn });
+    return initImportDeclaration({ name, id });
   },
 });
 
@@ -74,12 +71,12 @@ export const statementDispatch = /** @type {const} */ ({
  *
  * @returns {import('meriyah').ESTree.VariableDeclaration}
  */
-export const initImportDeclaration = ({ name, id, cdn = true }) => {
+const initImportDeclaration = ({ name, id }) => {
   const { properties = [] } = id;
   const value = properties[0]?.key?.name;
   const declarator = { type: 'VariableDeclarator', id: { type: 'ObjectPattern', properties } };
   const ast = { kind: 'var', type: 'VariableDeclaration', declarations: [declarator] };
-  const remote = isUnresolvableImport(name, cdn);
+  const remote = isUnresolvableImport(name);
   const source = remote ? `https://cdn.jsdelivr.net/npm/${name}/+esm` : name;
 
   // already resolved from previous network import
@@ -195,7 +192,7 @@ export const initImportDeclaration = ({ name, id, cdn = true }) => {
  * @param {string} alias
  * @returns {import('meriyah').ESTree.Property}
  */
-export const initProp = (prop, alias) => ({
+const initProp = (prop, alias) => ({
   type: 'Property',
   kind: 'init',
   method: false,
