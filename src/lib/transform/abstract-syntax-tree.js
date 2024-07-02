@@ -1,39 +1,39 @@
 import { isUnresolvableImport } from './util.js';
 
-export const dispatchAST = /** @type {const} */ ({
-  /** @param {import('meriyah').ESTree.ExpressionStatement} */
-  ExpressionStatement({ expression, ...rest }) {
+const { assign } = Object;
+
+/** @type {import('acorn-walk').SimpleVisitors<{}>} */
+export const nodeDispatch = {
+  ExpressionStatement(node) {
+    const { expression, ...rest } = node;
     const { type, tag: object = {} } = expression ?? {};
     if (`${object.name}${object.type}${type}` !== '$IdentifierTaggedTemplateExpression') return;
-    const tag = { type: 'MemberExpression', object, property: { type: 'Identifier', name: 'run' } };
-    return { ...rest, expression: { ...expression, type, tag } };
+    const property = { type: 'Identifier', name: 'run' };
+    const tag = { type: 'MemberExpression', object, property };
+    return assign(node, { ...rest, expression: { ...expression, type, tag } });
   },
-  /** @param {import('meriyah').ESTree.VariableDeclaration} declaration */
-  VariableDeclaration(declaration) {
-    declaration.kind = 'var';
-    if (!declaration.declarations?.length) return;
-    const [{ id, init }] = declaration.declarations;
+  VariableDeclaration(node) {
+    node.kind = 'var';
+    if (!node.declarations?.length) return;
+    const [{ id, init }] = node.declarations;
     const { type, source } = { ...init?.argument, ...init?.argument?.callee?.object };
     // dynamic import -> resolved dynamic import
     if (type === 'ImportExpression') {
       const { value: name } = source;
-      return initImportDeclaration({ name, id });
+      return assign(node, initImportDeclaration({ name, id }));
     }
 
     const { name, expressions } = init?.callee ?? {};
     const { object, property } = expressions?.[1] ?? {};
-    const transpiledName = [object?.name, property?.name].filter(Boolean).join('.');
+    const transpiledName = [object?.name, property?.name].join('.');
     // common.js require -> resolved dynamic import
     if (name === 'require' || transpiledName === 'global.require') {
       const [{ value: name }] = init.arguments;
-      return initImportDeclaration({ name, id });
+      return assign(node, initImportDeclaration({ name, id }));
     }
-
-    return declaration;
   },
-  /** @param {import('meriyah').ESTree.ImportDeclaration} declaration */
-  ImportDeclaration(declaration) {
-    const { specifiers, source: { value: name } } = declaration;
+  ImportDeclaration(node) {
+    const { specifiers, source: { value: name } } = node;
     const id = specifiers.reduce((acc, { type, local, imported }) => {
       if (type === 'ImportDefaultSpecifier') acc.name = local.name;
       else if (type === 'ImportSpecifier') {
@@ -57,8 +57,24 @@ export const dispatchAST = /** @type {const} */ ({
       return acc;
     }, { type: 'Identifier' });
 
-    return initImportDeclaration({ name, id });
+    return assign(node, initImportDeclaration({ name, id }));
   },
+};
+
+/**
+ * subtree for `({ prop: alias })`
+ * @param {string} prop
+ * @param {string} alias
+ * @returns {import('meriyah').ESTree.Property}
+ */
+const initProp = (prop, alias) => ({
+  type: 'Property',
+  kind: 'init',
+  method: false,
+  computed: false,
+  shorthand: prop === alias,
+  key: { type: 'Identifier', name: prop },
+  value: { type: 'Identifier', name: alias },
 });
 
 /**
@@ -185,19 +201,3 @@ const initImportDeclaration = ({ name, id }) => {
 
   return ast;
 };
-
-/**
- * subtree for `({ prop: alias })`
- * @param {string} prop
- * @param {string} alias
- * @returns {import('meriyah').ESTree.Property}
- */
-const initProp = (prop, alias) => ({
-  type: 'Property',
-  kind: 'init',
-  method: false,
-  computed: false,
-  shorthand: prop === alias,
-  key: { type: 'Identifier', name: prop },
-  value: { type: 'Identifier', name: alias },
-});
