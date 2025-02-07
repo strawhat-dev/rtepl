@@ -2,13 +2,13 @@ import repl from 'node:repl';
 import termsize from 'terminal-size';
 import stringWidth from 'fast-string-width';
 import { inspectDefaults } from './config.js';
-import { define, entries, isDefined, memoize, reduce } from '../util.js';
+import { define, isDefined, memo, reduce } from '../util.js';
 import { ansiRegex, computeCommonPrefixLength, matchingBrackets } from './util.js';
 import { initHighlighter } from './highlight.js';
 import { setupPreview } from './preview.js';
 import { ansi } from '../ansi.js';
 
-const { assign, defineProperties } = Object;
+const { entries, assign, defineProperties } = Object;
 
 // Every open/close pair that should be matched against its counterpart for highlighting.
 const BRACKETS = '()[]{}\'"`$';
@@ -41,12 +41,12 @@ export class REPLServer extends repl.REPLServer {
 
     this.setErrorPrompt = () => void assign(this, { promptStatus: 'error' });
     this.setDefaultPrompt = () => void assign(this, { promptStatus: 'default' });
-    this.findAllMatchingBracketsIgnoreMismatches = memoize((str) => matchingBrackets(str, true));
-    this.findAllMatchingBracketsIncludeMismatches = memoize((str) => matchingBrackets(str, false));
-    this.computeCommonPrefixLength = memoize(computeCommonPrefixLength);
-    this.strlen = memoize((str) => stringWidth(String(str)));
+    this.findAllMatchingBracketsIgnoreMismatches = memo((str) => matchingBrackets(str, true));
+    this.findAllMatchingBracketsIncludeMismatches = memo((str) => matchingBrackets(str, false));
+    this.computeCommonPrefixLength = memo(computeCommonPrefixLength);
+    this.strlen = memo((str) => stringWidth(String(str)));
 
-    this.findMatchingBracket = memoize((line, position) => {
+    this.findMatchingBracket = memo((line, position) => {
       // Find the matching bracket opposite of the one at position.
       const brackets = this.findAllMatchingBracketsIncludeMismatches(line);
       for (const { start, end } of brackets) {
@@ -57,7 +57,7 @@ export class REPLServer extends repl.REPLServer {
       return -1;
     });
 
-    this.stripCompleteJSStructures = memoize((str) => {
+    this.stripCompleteJSStructures = memo((str) => {
       // Remove substructures of the JS input string `str` in order to simplify it,
       // by removing matching pairs of quotes and parentheses/brackets.
       // Specifically, remove all but the last, non-nested pair of (), because ()

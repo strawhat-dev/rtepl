@@ -1,11 +1,11 @@
-/** @type {import('node:util').InspectOptions} */
-export const inspectDefaults = {
+/** @satisfies {import('node:util').InspectOptions} */
+export const inspectDefaults = /** @type {const} */ ({
   colors: true,
   depth: Infinity,
   compact: Infinity,
   maxArrayLength: Infinity,
   maxStringLength: Infinity,
-};
+});
 
 export const supportedProps = /** @type {const} */ ([
   'color',

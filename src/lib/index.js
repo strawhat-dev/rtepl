@@ -3,7 +3,7 @@ import parseCommand from 'yargs-parser';
 import prettyREPL from './pretty-repl/index.js';
 import { transpileREPL } from './transform/index.js';
 import { defaultConfig, parserOptions } from './config.js';
-import { setupREPL, setupShell } from './augment.js';
+import { setupREPL, setupShell } from './repl.js';
 import { define, getprops } from './util.js';
 import { ansi } from './ansi.js';
 
@@ -32,7 +32,7 @@ export const initREPL = (init = {}) => {
         ),
         async eval(cmd, ...rest) {
           const evaluate = async (...args) => {
-            args.length || (args = await transpileREPL(cmd, ...rest));
+            args.length || (args = [await transpileREPL(cmd, rest[1]), ...rest]);
             return defaultEval(...args);
           };
 

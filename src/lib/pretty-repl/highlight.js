@@ -1,12 +1,14 @@
-import { ansi } from '../ansi.js';
-import { parse } from '@adobe/css-tools';
-import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+import { parse } from '@adobe/css-tools';
 import { createEmphasize } from 'emphasize';
-import { defaultSheet, supportedProps, themes } from './config.js';
-import { asArray, entries, foreach, memoize, reduce } from '../util.js';
-import typescript from 'highlight.js/lib/languages/typescript';
 import xml from 'highlight.js/lib/languages/xml';
+import typescript from 'highlight.js/lib/languages/typescript';
+import { defaultSheet, supportedProps, themes } from './config.js';
+import { asArray, foreach, memo, reduce } from '../util.js';
+import { ansi } from '../ansi.js';
+
+const { entries } = Object;
 
 /** @param {import('repl').ReplOptions} */
 export const initHighlighter = ({ theme, sheet: config }) => {
@@ -14,7 +16,7 @@ export const initHighlighter = ({ theme, sheet: config }) => {
   emphasize.register('typescript', typescript);
   emphasize.register('xml', xml); // needed for jsx support for some reason
   const sheet = initSheet({ ...defaultSheet, ...parseTheme(theme, config) });
-  const colorize = memoize((code) => emphasize.highlight('tsx', code, sheet).value);
+  const colorize = memo((code) => emphasize.highlight('tsx', code, sheet).value);
   return { colorize };
 };
 

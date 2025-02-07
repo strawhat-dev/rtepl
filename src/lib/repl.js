@@ -4,25 +4,30 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import findCacheDir from 'find-cache-dir';
 import { shellConfig } from './config.js';
-import { define, id } from './util.js';
+import { define } from './util.js';
 
-const clipboard = await import('clipboardy').then((cb) => ({
-  read: cb.default.readSync,
-  write: cb.default.write,
-}));
+const clipboard = await import('clipboardy').then(
+  ({ default: cb }) => ({ read: cb.readSync, write: cb.write })
+);
 
 const pe = await import('pretty-error').then(({ default: PrettyError }) => {
   const pe = new PrettyError();
   return pe.skipNodeFiles(), pe;
 });
 
+const resolve_dynamic_module = (key, defaultImport, namedImport) => {
+  const mod = global[key];
+  defaultImport && (global[defaultImport] = mod.default || mod);
+  return namedImport in mod ? mod : mod.default;
+};
+
 /** @param {import('rtepl').REPLServer} repl */
 export const setupREPL = (repl) => {
   try {
     const cwd = dirname(fileURLToPath(import.meta.url));
     const dir = findCacheDir({ cwd, name: 'rtepl', create: true });
-    dir && repl.setupHistory(join(dir, '.node_repl_history'), id);
-  } catch (_) {}
+    dir && repl.setupHistory(join(dir, '.node_repl_history'), Boolean);
+  } catch {}
 
   define(repl, { clipboard });
   define(repl.context, { resolve_dynamic_module });
@@ -48,14 +53,8 @@ export const setupShell = (repl, shell = 'bash') => {
       const controller = new AbortController();
       const cancelSignal = controller.signal;
       const $ = spawn({ ...shellConfig.repl, cancelSignal });
-      repl.once('SIGINT', controller.abort.bind(controller));
-      $(...args).once('spawn', repl.clearBufferedCommand).once('exit', repl.resume);
+      repl.on('SIGINT', controller.abort.bind(controller));
+      $(...args).once('spawn', repl.clearBufferedCommand).on('exit', repl.resume);
     },
   });
-};
-
-const resolve_dynamic_module = (key, defaultImport, namedImport) => {
-  const mod = global[key];
-  defaultImport && (global[defaultImport] = mod.default || mod);
-  return namedImport in mod ? mod : mod.default;
 };

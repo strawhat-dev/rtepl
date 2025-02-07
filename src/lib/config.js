@@ -1,60 +1,61 @@
 import which from 'which';
 import { readFile } from 'node:fs/promises';
 
-const read = async (file) => readFile(file, { encoding: 'utf-8' });
+/** @satisfies {import('node:fs').EncodingOption} */
+const encoding = 'utf8';
 
+/** @satisfies {Record<string, import('execa').Options>} */
 export const shellConfig = /** @type {const} */ ({
-  base: { reject: true, cleanup: true, extendEnv: true, preferLocal: false, windowsHide: false },
+  base: { encoding, reject: true, cleanup: true, extendEnv: true, preferLocal: false },
   repl: { stdio: 'inherit', stripFinalNewline: false, forceKillAfterDelay: 100 }, // tty shell
 });
 
-/** @type {import('rtepl').ReplOptions} */
-export const defaultConfig = {
+/** @satisfies {import('rtepl').ReplOptions} */
+export const defaultConfig = /** @type {const} */ ({
   useGlobal: true,
   useColors: true,
   historySize: 1000,
   ignoreUndefined: true,
   theme: 'atom-one-dark',
-};
+});
 
-/** @type {import('yargs-parser').Options} */
-export const parserOptions = {
+/** @satisfies {import('yargs-parser').Options} */
+export const parserOptions = /** @type {const} */ ({
   configuration: {
     'parse-numbers': false,
     'unknown-options-as-args': true,
   },
-};
+});
 
 /**
  * @typedef {typeof commands} DefaultCommands
- * @type {import('rtepl').ReplOptions['commands']}
+ * @satisfies {import('rtepl').ReplOptions['commands']}
  */
-export const commands = {
+export const commands = /** @type {const} */ ({
   exit: ({ repl }) => repl.write(null, { ctrl: true, name: 'd' }),
   clear: ({ repl }) => (repl.write(null, { ctrl: true, name: 'l' }), repl.resume()),
-  cat: ({ repl, args }) => {
+  // prettier-ignore
+  cd({ ansi, repl, args }) {
     repl.clearBufferedCommand();
-    read(args).then(console.log).catch(repl.setErrorPrompt).finally(repl.resume);
-  },
-  which({ repl, args }) {
-    repl.clearBufferedCommand();
-    which(args).then(console.log).catch(repl.setErrorPrompt).finally(repl.resume);
+    if ((args = args.trim())) {
+      try { process.chdir(args); }
+      catch { repl.setErrorPrompt(); }
+    }
+    console.log(ansi.blue.underline(process.cwd()));
+    repl.resume();
   },
   ls({ $, argv }) {
     const flags = ['-A', '--group-directories-first', '--file-type', '--color=auto'];
     const ignore = ['ntuser*', 'NTUSER*', '.DS_Store'].map((pattern) => `--ignore='${pattern}'`);
     $`ls ${[...flags, ...ignore, ...argv]}`;
   },
-  cd({ ansi, repl, args }) {
-    try {
-      repl.clearBufferedCommand();
-      process.chdir(args);
-      console.log(ansi.blue.underline(process.cwd()));
-    } catch {
-      repl.setErrorPrompt();
-    } finally {
-      repl.resume();
-    }
+  cat: ({ repl, args }) => {
+    repl.clearBufferedCommand();
+    readFile(args, { encoding }).then(console.log).catch(repl.setErrorPrompt).finally(repl.resume);
+  },
+  which({ repl, args }) {
+    repl.clearBufferedCommand();
+    which(args).then(console.log).catch(repl.setErrorPrompt).finally(repl.resume);
   },
   '?': ({ args, evaluate }, rest) => {
     args ||= 'undefined';
@@ -63,4 +64,4 @@ export const commands = {
     const formatProps = `$.repl.formatColumns(getprops(${args}))`;
     return evaluate(`console.log(${highlightName}), ${formatProps}`, ...rest);
   },
-};
+});

@@ -1,9 +1,10 @@
 import { isUnresolvableImport } from './util.js';
+import { reduce } from '../util.js';
 
 const { assign } = Object;
 
-/** @type {import('acorn-walk').SimpleVisitors<{}>} */
-export const nodeDispatch = {
+/** @satisfies {import('acorn-walk').SimpleVisitors<{}>} */
+export const nodeDispatch = /** @type {const} */ ({
   ExpressionStatement(node) {
     const { expression, ...rest } = node;
     const { type, tag: object = {} } = expression ?? {};
@@ -34,7 +35,7 @@ export const nodeDispatch = {
   },
   ImportDeclaration(node) {
     const { specifiers, source: { value: name } } = node;
-    const id = specifiers.reduce((acc, { type, local, imported }) => {
+    const id = reduce(specifiers, { type: 'Identifier' }, (acc, { type, local, imported }) => {
       if (type === 'ImportDefaultSpecifier') acc.name = local.name;
       else if (type === 'ImportSpecifier') {
         acc.type = 'ObjectPattern';
@@ -55,11 +56,11 @@ export const nodeDispatch = {
       }
 
       return acc;
-    }, { type: 'Identifier' });
+    });
 
     return assign(node, initImportDeclaration({ name, id }));
   },
-};
+});
 
 /**
  * subtree for `({ prop: alias })`

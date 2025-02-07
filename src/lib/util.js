@@ -1,21 +1,28 @@
 const { isArray } = Array;
 
-const { keys, fromEntries, defineProperty, getPrototypeOf, getOwnPropertyNames } = Object;
+const { entries, fromEntries, defineProperty, getPrototypeOf, getOwnPropertyNames } = Object;
+
+/** @type {import('micro-memoize')['default']} */
+export const memo = await import('micro-memoize').then(
+  ({ default: memoize }) => (fn, opts) => memoize(fn, { maxSize: 100, ...opts })
+);
 
 export const isDefined = (x) => x != null && !Number.isNaN(x);
 
-/** @type {<T>(x: T) => T} */
-export const id = (x) => x;
-
-/** @type {<T extends ((...args: readonly any[]) => any)>(fn: T) => T} */
-export const memoize = await import('memoize-one').then((memo) => memo.default);
-
 /** @type {<T extends readonly any[]>(x: T) => T} */
-export const asArray = (x) => isArray(x) ? x : isDefined(x) ? [x] : [];
+export const asArray = (x) => (isArray(x) ? x : isDefined(x) ? [x] : []);
 
 /** @param {string} x @param {number} i */
 export const splitIndex = (x, i) => /** @type {const} */ ([x?.slice(0, i), x?.slice(i)]);
 
+/**
+ * @template T
+ * @template R
+ * @template Init
+ * @param {readonly T[]} arr
+ * @param {readonly [Init, (acc: Init, cur: T, i: number) => R]} args
+ * @returns {Init & R}
+ */
 export const reduce = (arr, ...args) => {
   const [init = {}, reducer] = args;
   !isArray(arr) && arr[Symbol.iterator] && (arr = [...arr]);
@@ -43,21 +50,8 @@ export const foreach = (arr, callback) => {
  */
 export const define = (target, props) => {
   props || ([target, props] = [{}, target]);
-  for (const key of keys(props)) defineProperty(target, key, { value: props[key] });
+  for (const [key, value] of entries(props)) defineProperty(target, key, { value });
   return target;
-};
-
-/**
- * @template {object} T
- * @param {T} obj
- * @returns {[keyof T, T[keyof T]][]}
- */
-export const entries = (obj) => {
-  if (!obj) return [];
-  const ret = keys(obj);
-  const len = ret.length;
-  for (let i = 0; i < len; ++i) ret[i] = [ret[i], obj[ret[i]]];
-  return ret;
 };
 
 /**
@@ -93,10 +87,9 @@ export const istr = (str) => {
 };
 
 /**
- * @template {string} SubString
  * @param {string} str
- * @param {SubString} substr
- * @returns {[string, SubString | '', string]}
+ * @param {string} substr
+ * @returns {readonly [string, string, string]}
  */
 export const splitSubstr = (str, substr) => {
   if (str == null) return ['', '', ''];
@@ -115,17 +108,17 @@ export const splitSubstr = (str, substr) => {
  * @returns {T}
  */
 export const sorted = (...args) => {
-  if (!args.length) return (x) => sorted(x, id);
+  if (!args.length) return (x) => sorted(x);
   if (args.length === 1 && typeof args[0] === 'function') return (x) => sorted(x, args[0]);
   const [obj, sortkey] = args;
-  const compare = compareWithKey(sortkey);
+  const compare = compareWithKey(sortkey || ((x) => x));
   if (obj?.[Symbol.iterator]) return [...obj].sort(compare);
   return fromEntries(entries(obj).sort(([a], [b]) => compare(a, b)));
 };
 
 const sortOptions = /** @type {const} */ (['en-US', { usage: 'sort', numeric: true }]);
 
-const compareWithKey = (sortkey = id) => (a, b) => {
+const compareWithKey = (sortkey) => (a, b) => {
   [a, b] = [sortkey(a), sortkey(b)];
   if (typeof a === 'string') return a.localeCompare(b, ...sortOptions);
   if (typeof b === 'string') return -b.localeCompare(a, ...sortOptions);

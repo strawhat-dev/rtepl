@@ -1,4 +1,4 @@
-#!/usr/bin/env -S node --no-warnings --experimental-network-imports --experimental-detect-module
+#!/usr/bin/env node
 
 import { commands, start } from './index.js';
 

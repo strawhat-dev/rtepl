@@ -1,9 +1,9 @@
 import rl from 'node:readline';
 import { ansi } from '../ansi.js';
-import { id, istr, memoize, sorted, splitIndex, splitSubstr } from '../util.js';
+import { istr, memo, sorted, splitIndex, splitSubstr } from '../util.js';
 
 const distance = await import('fastest-levenshtein').then(
-  ({ distance }) => memoize(distance)
+  ({ distance }) => memo(distance)
 );
 
 const getCursorPos = await import('get-cursor-position').then(
@@ -144,7 +144,7 @@ export const setupPreview = (repl) => {
     ) {
       assign(
         completion,
-        { preview: [dim(inputPreview), completion.preview?.trim()].filter(id).join('\n') },
+        { preview: [dim(inputPreview), completion.preview?.trim()].filter(Boolean).join('\n') },
         key.sequence === '\x1B[C' && { insert: inputPreview, useDefaultComplete: true }
       );
     }

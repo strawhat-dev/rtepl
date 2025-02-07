@@ -1,12 +1,10 @@
-import { createRequire, isBuiltin } from 'node:module';
 import { join } from 'node:path';
 import { transform } from 'esbuild';
-import { memoize } from '../util.js';
+import { parse as meriyah } from 'meriyah';
+import { createRequire, isBuiltin } from 'node:module';
 
-/** @type {(code: string) => import('meriyah').ESTree.Program} */
-export const parse = await import('meriyah').then(({ parse }) =>
-  memoize((code) => parse(code, parserOptions))
-);
+/** @param {string} code */
+export const parse = (code) => meriyah(code, parserOptions);
 
 /** @param {string} code @param {string} sourcefile */
 export const esbuild = async (code, sourcefile) => {
@@ -15,17 +13,17 @@ export const esbuild = async (code, sourcefile) => {
   return code;
 };
 
-/** @param {string} name */
-export const isUnresolvableImport = (name) => {
+/** @param {string} identifier */
+export const isUnresolvableImport = (identifier) => {
   if (
-    isBuiltin(name) || // node.js builtins
-    name.startsWith('./') || // relative-imports
-    name.startsWith('https:') // network-imports
+    isBuiltin(identifier) || // node.js builtins
+    identifier.startsWith('./') || // relative-imports
+    /^https?:\/\//.test(identifier) // network-imports
   ) return false;
 
   try {
     const require = createRequire(join(process.cwd(), 'index.js'));
-    if (require.resolve(name)) return false;
+    if (require.resolve(identifier)) return false;
   } catch {}
 
   return true;
@@ -33,9 +31,9 @@ export const isUnresolvableImport = (name) => {
 
 /**
  * {@link https://github.com/privatenumber/tsx/blob/master/src/patch-repl.ts}
- * @type {import('esbuild').TransformOptions}
+ * @satisfies {import('esbuild').TransformOptions}
  */
-const esconfig = {
+const esconfig = /** @type {const} */ ({
   minify: false,
   loader: 'tsx',
   format: 'esm',
@@ -44,13 +42,13 @@ const esconfig = {
   jsx: 'automatic',
   define: { require: 'global.require' },
   tsconfigRaw: { compilerOptions: { preserveValueImports: true } },
-};
+});
 
-/** @type {import('meriyah').Options} */
-const parserOptions = {
+/** @satisfies {import('meriyah').Options} */
+const parserOptions = /** @type {const} */ ({
   jsx: true,
   next: true,
   module: true,
   specDeviation: true,
   preserveParens: true,
-};
+});
