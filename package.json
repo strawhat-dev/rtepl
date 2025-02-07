@@ -2,7 +2,7 @@
   "name": "rtepl",
   "type": "module",
   "license": "MIT",
-  "version": "0.1.9",
+  "version": "0.2.0",
   "author": "strawhat-dev",
   "repository": "github:strawhat-dev/rtepl",
   "description": "Read-[Transpile]-Eval-Print-Loop w/ syntax highlighting",
