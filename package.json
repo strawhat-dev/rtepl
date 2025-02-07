@@ -1,53 +1,52 @@
 {
   "name": "rtepl",
+  "type": "module",
   "license": "MIT",
   "version": "0.1.9",
   "author": "strawhat-dev",
   "repository": "github:strawhat-dev/rtepl",
-  "description": "Read-[transpile]-Eval-Print-Loop w/ syntax highlighting",
-  "type": "module",
-  "files": [
-    "src"
-  ],
+  "description": "Read-[Transpile]-Eval-Print-Loop w/ syntax highlighting",
   "module": "./src/index.js",
   "exports": "./src/index.js",
   "types": "./src/index.d.ts",
   "bin": "./src/cli.js",
-  "engines": {
-    "node": ">=18.0.0"
-  },
+  "files": [
+    "src",
+    "http-loader.mjs"
+  ],
   "scripts": {
-    "start": "node --no-warnings --experimental-network-imports --experimental-detect-module src/cli.js",
+    "start": "node src/cli.js",
     "lint": "eslint src"
   },
   "dependencies": {
-    "@adobe/css-tools": "^4.4.0",
-    "acorn-walk": "^8.3.3",
+    "@adobe/css-tools": "^4.4.1",
+    "acorn-walk": "^8.3.4",
     "ansi-escapes": "^7.0.0",
-    "ansi-regex": "^6.0.1",
-    "ansis": "^3.3.2",
-    "astring": "^1.8.6",
+    "ansi-regex": "^6.1.0",
+    "ansis": "^3.10.0",
+    "astring": "^1.9.0",
     "clipboardy": "^4.0.0",
     "emphasize": "^7.0.0",
-    "esbuild": "^0.23.0",
-    "execa": "^9.3.0",
-    "fast-string-width": "^1.0.5",
+    "esbuild": "^0.24.2",
+    "execa": "^9.5.2",
+    "fast-string-width": "^1.1.0",
     "fastest-levenshtein": "^1.0.16",
     "find-cache-dir": "^5.0.0",
     "get-cursor-position": "^2.0.0",
-    "highlight.js": "^11.10.0",
-    "memoize-one": "^6.0.0",
-    "meriyah": "^5.0.0",
+    "highlight.js": "^11.11.1",
+    "meriyah": "^6.0.5",
+    "micro-memoize": "^4.1.3",
     "pretty-error": "^4.0.0",
     "terminal-size": "^4.0.0",
-    "which": "^4.0.0",
+    "which": "^5.0.0",
     "yargs-parser": "^21.1.1"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^22.13.1",
     "@types/which": "^3.0.4",
     "@types/yargs-parser": "^21.0.3",
-    "eslint": "8.57.0",
-    "eslint-define-config": "^2.1.0"
+    "eslint": "^9.19.0",
+    "eslint-define-config": "^2.1.0",
+    "eslint-plugin-import": "^2.31.0"
   }
 }
