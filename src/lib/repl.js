@@ -29,8 +29,7 @@ export const setupREPL = (repl) => {
     dir && repl.setupHistory(join(dir, '.node_repl_history'), Boolean);
   } catch {}
 
-  define(repl, { clipboard });
-  define(repl.context, { resolve_dynamic_module });
+  define(repl.context, { clipboard, resolve_dynamic_module });
   define(repl._domain._events, {
     error(error) {
       pe.render(error, true, true);
