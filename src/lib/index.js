@@ -1,4 +1,5 @@
 import os from 'node:os';
+import { register } from 'node:module';
 import parseCommand from 'yargs-parser';
 import prettyREPL from './pretty-repl/index.js';
 import { transpileREPL } from './transform/index.js';
@@ -21,6 +22,7 @@ export const initREPL = (init = {}) => {
       const config = { ...defaultConfig, ...init, ...options };
       const { commands = {}, shell, ...server } = config;
       const repl = (displayEnvironmentInfo(), setupREPL(start(server)));
+      register('./http-loader.js', import.meta.url);
       const defaultEval = repl.eval.bind(repl);
       const $ = setupShell(repl, shell);
       return define(repl, {
