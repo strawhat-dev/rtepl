@@ -208,8 +208,8 @@ export const setupPreview = (repl) => {
     }
 
     if (key.ctrl && key.name === 'v') {
-      const text = repl.context.clipboard.read().replaceAll('\r', '');
-      return repl._insertString(ansi.strip(text).trim());
+      const text = repl.context.clipboard.read();
+      return repl._insertString(ansi.strip(text));
     }
 
     if (key.ctrl && key.name === 'z') {

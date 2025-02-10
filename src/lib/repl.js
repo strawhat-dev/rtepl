@@ -7,7 +7,10 @@ import { shellConfig } from './config.js';
 import { define } from './util.js';
 
 const clipboard = await import('clipboardy').then(
-  ({ default: cb }) => ({ read: cb.readSync, write: cb.write })
+  ({ default: cb }) => ({
+    read: () => cb.readSync().replaceAll('\r', '').trim(),
+    write: cb.write,
+  })
 );
 
 const pe = await import('pretty-error').then(({ default: PrettyError }) => {
